@@ -1,0 +1,114 @@
+# Alert Rules for Gate.io Arbitrage Suite
+groups:
+  - name: arbitrage_alerts
+    interval: 30s
+    rules:
+      # High Loss Alert
+      - alert: HighLoss
+        expr: arbitrage_session_pnl < -500
+        for: 1m
+        labels:
+          severity: critical
+          component: arbitrage
+        annotations:
+          summary: "High loss detected: {{ $value }}$"
+          description: "Session PnL is below -$500: {{ $value }}$"
+          
+      # Circuit Breaker Triggered
+      - alert: CircuitBreakerTriggered
+        expr: arbitrage_circuit_breaker_triggered == 1
+        for: 1m
+        labels:
+          severity: warning
+          component: risk_management
+        annotations:
+          summary: "Circuit breaker has been triggered"
+          description: "Trading has been halted due to risk limits"
+          
+      # API Rate Limit
+      - alert: APIRateLimitNear
+        expr: gate_api_requests_per_second > 8
+        for: 30s
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Approaching API rate limit"
+          description: "API request rate: {{ $value }}/s (limit: 10/s)"
+          
+      # Low Balance
+      - alert: LowBalance
+        expr: account_balance_usdt < 100
+        for: 5m
+        labels:
+          severity: warning
+          component: account
+        annotations:
+          summary: "Low USDT balance: {{ $value }}$"
+          description: "USDT balance is below $100"
+          
+      # No Trades Alert
+      - alert: NoTradesExecuted
+        expr: rate(total_trades[1h]) == 0
+        for: 2h
+        labels:
+          severity: info
+          component: trading
+        annotations:
+          summary: "No trades executed in last 2 hours"
+          description: "Check if strategies are finding opportunities"
+          
+      # High Slippage
+      - alert: HighSlippage
+        expr: avg_slippage_bps > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: execution
+        annotations:
+          summary: "High slippage detected: {{ $value }} bps"
+          description: "Average slippage exceeds 10 bps"
+          
+      # Connection Lost
+      - alert: ExchangeConnectionLost
+        expr: up{job="gate-api-health"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: connectivity
+        annotations:
+          summary: "Lost connection to Gate.io"
+          description: "Cannot reach Gate.io API"
+          
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: rate(errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High error rate: {{ $value }}/s"
+          description: "Error rate exceeds threshold"
+          
+      # Funding Rate Alert
+      - alert: HighFundingRate
+        expr: abs(funding_rate_8h) > 0.002
+        for: 30m
+        labels:
+          severity: info
+          component: perpetuals
+        annotations:
+          summary: "High funding rate: {{ $value }}"
+          description: "Perpetual funding rate exceeds 0.2% per 8h"
+          
+      # Memory Usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage: {{ $value | humanizePercentage }}"
+          description: "System memory usage exceeds 90%"

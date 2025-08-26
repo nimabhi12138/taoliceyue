@@ -1,0 +1,248 @@
+version: '3.8'
+
+services:
+  # Hummingbot with Arbitrage Suite
+  hummingbot:
+    image: hummingbot/hummingbot:latest
+    container_name: hummingbot-prod
+    volumes:
+      - ./conf:/conf
+      - ./logs:/logs
+      - ./data:/data
+      - ./scripts:/scripts
+      - ./controllers:/controllers
+    environment:
+      - CONFIG_PASSWORD=${HUMMINGBOT_PASSWORD}
+      - KILL_SWITCH_ENABLED=true
+      - KILL_SWITCH_RATE=-0.1  # Stop if lose 10%
+    networks:
+      - arbitrage-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ../webui/backend
+      dockerfile: Dockerfile
+    container_name: gate-arb-backend-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://user:pass@postgres:5432/arbitrage}
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+    volumes:
+      - ../conf:/hummingbot/conf
+      - ../logs:/hummingbot/logs
+      - ./secrets:/secrets:ro
+    networks:
+      - arbitrage-network
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Streamlit Frontend
+  frontend:
+    build:
+      context: ../webui/frontend
+      dockerfile: Dockerfile
+    container_name: gate-arb-frontend-prod
+    ports:
+      - "8501:8501"
+    environment:
+      - API_BASE_URL=http://backend:8000
+    networks:
+      - arbitrage-network
+    depends_on:
+      - backend
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: gate-arb-postgres
+    environment:
+      - POSTGRES_USER=${DB_USER:-arbitrage}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=arbitrage
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - arbitrage-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-arbitrage}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: gate-arb-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    networks:
+      - arbitrage-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: gate-arb-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    volumes:
+      - ../monitoring/prometheus_config.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - arbitrage-network
+    restart: always
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: gate-arb-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - arbitrage-network
+    depends_on:
+      - prometheus
+    restart: always
+
+  # Alertmanager
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: gate-arb-alertmanager
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - arbitrage-network
+    restart: always
+
+  # Nginx Reverse Proxy with SSL
+  nginx:
+    image: nginx:alpine
+    container_name: gate-arb-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../webui/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./htpasswd:/etc/nginx/htpasswd:ro
+    networks:
+      - arbitrage-network
+    depends_on:
+      - backend
+      - frontend
+      - grafana
+    restart: always
+
+  # Log Aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: gate-arb-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    networks:
+      - arbitrage-network
+    restart: always
+
+  # Log Shipper
+  promtail:
+    image: grafana/promtail:latest
+    container_name: gate-arb-promtail
+    volumes:
+      - ../logs:/var/log/arbitrage:ro
+      - /var/log:/var/log/host:ro
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+    networks:
+      - arbitrage-network
+    restart: always
+
+  # Backup Service
+  backup:
+    image: offen/docker-volume-backup:latest
+    container_name: gate-arb-backup
+    environment:
+      - BACKUP_FILENAME=gate-arb-backup-%Y%m%d-%H%M%S.tar.gz
+      - BACKUP_PRUNING_PREFIX=gate-arb-backup-
+      - BACKUP_RETENTION_DAYS=7
+      - BACKUP_CRON_EXPRESSION=0 2 * * *  # Daily at 2 AM
+    volumes:
+      - postgres-data:/backup/postgres-data:ro
+      - redis-data:/backup/redis-data:ro
+      - ./conf:/backup/conf:ro
+      - ./backups:/archive
+    networks:
+      - arbitrage-network
+    restart: always
+
+networks:
+  arbitrage-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+  alertmanager-data:
+  loki-data:
