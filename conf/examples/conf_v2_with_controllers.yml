@@ -71,6 +71,55 @@ controllers:
         max_drawdown: 0.03      # 3%
         kelly_multiplier: 0.2   # 20% of Kelly
 
+  # Spot-Spot Cross-Market Arbitrage Controller
+  - controller_name: arbitrage.gate_spot_spot_controller
+    controller_type: GateSpotSpotController
+    controller_config:
+      primary_connector: gate_io
+      secondary_connectors: []  # Add other exchanges for cross-venue
+      trading_pairs:
+        - BTC-USDT
+        - ETH-USDT
+        - BNB-USDT
+      min_profitability_bps: 8
+      max_position_size: 1.0
+      slippage_buffer_bps: 3
+      prefer_maker_orders: true
+      enable_intra_exchange: true
+      fee_override_path: conf/examples/conf_fee_overrides.yml
+      risk_config:
+        max_position_size: 1.0
+        max_symbol_exposure: 2.0
+        max_total_exposure: 5.0
+        max_session_loss: 0.08
+        max_drawdown: 0.04
+        kelly_multiplier: 0.25
+
+  # Statistical Arbitrage Controller (Optional)
+  - controller_name: arbitrage.gate_stat_arb_controller
+    controller_type: GateStatArbController
+    controller_config:
+      connector: gate_io
+      trading_pairs:
+        BTC-USDT_ETH-USDT:
+          hedge_ratio: 1.0
+          correlation: 0.0
+          half_life: 1800.0
+      lookback_period: 200
+      z_score_entry: 2.0
+      z_score_exit: 0.5
+      z_score_stop: 3.5
+      min_correlation: 0.7
+      max_position_size: 1.0
+      fee_override_path: conf/examples/conf_fee_overrides.yml
+      risk_config:
+        max_position_size: 1.0
+        max_symbol_exposure: 2.0
+        max_total_exposure: 4.0
+        max_session_loss: 0.06
+        max_drawdown: 0.03
+        kelly_multiplier: 0.2
+
 # Global risk management
 global_config:
   # Emergency stop conditions

@@ -1,0 +1,79 @@
+controller_name: arbitrage.gate_spot_perp_controller
+controller_type: GateSpotPerpController
+
+# Gate.io Spot-Perp Arbitrage Controller Configuration
+# Cash-and-carry arbitrage between Gate.io spot and perpetual markets
+
+# Market Configuration
+markets:
+  spot_connector: gate_io
+  perp_connector: gate_io_perpetual
+  trading_pairs:
+    - BTC-USDT
+    - ETH-USDT
+    - BNB-USDT
+    - ADA-USDT
+    - SOL-USDT
+
+# Profitability Settings
+profitability:
+  min_profitability_bps: 8          # Minimum profit after all costs (8 bps = 0.08%)
+  slippage_buffer_bps: 3            # Buffer for slippage (3 bps = 0.03%)
+  funding_rate_threshold_bps: 50    # Maximum acceptable funding rate (50 bps = 0.5%)
+  carry_threshold_bps: 12           # Minimum carry profit threshold
+
+# Position Management  
+position_management:
+  max_position_size: 1.0            # Maximum position size per trade
+  max_concurrent_positions: 3       # Maximum number of concurrent arbitrages
+  prefer_maker_orders: true         # Prefer post-only orders when possible
+  hedge_immediately: true           # Hedge spot/perp positions immediately
+  rebalance_threshold_bps: 5        # Rebalance when delta exceeds threshold
+
+# Execution Settings
+execution:
+  order_timeout_seconds: 30         # Order timeout before cancellation
+  max_retries: 3                   # Maximum retry attempts
+  retry_delay_seconds: 1           # Delay between retries
+  partial_fill_threshold: 0.8     # Accept partial fills above this ratio
+  enable_post_only: true          # Use post-only orders when possible
+  ioc_fallback: true              # Use IOC if post-only fails
+
+# Risk Management
+risk_config:
+  max_position_size: 1.0           # Hard cap on position size
+  max_symbol_exposure: 2.0         # Maximum exposure per symbol
+  max_total_exposure: 5.0          # Maximum total exposure across all symbols
+  max_session_loss: 0.1            # Maximum session loss (10%)
+  max_drawdown: 0.05               # Maximum drawdown (5%)
+  kelly_multiplier: 0.25           # Kelly criterion multiplier (conservative)
+  min_win_rate: 0.4               # Minimum required win rate
+  min_trade_count: 10             # Minimum trades before risk assessment
+
+# Circuit Breakers
+circuit_breakers:
+  enable_session_loss_breaker: true
+  enable_drawdown_breaker: true
+  enable_error_rate_breaker: true
+  enable_win_rate_breaker: true
+  max_error_rate: 0.1             # Maximum error rate (10%)
+  error_rate_window: 100          # Window for error rate calculation
+  cooldown_minutes: 15            # Cooldown period after circuit breaker
+
+# Fee Configuration
+fee_override_path: conf/examples/conf_fee_overrides.yml
+
+# Monitoring & Logging
+monitoring:
+  log_level: INFO
+  enable_performance_metrics: true
+  enable_position_tracking: true
+  status_update_interval: 10      # Status update interval in seconds
+  
+# Advanced Settings
+advanced:
+  price_staleness_threshold: 2    # Reject prices older than N seconds
+  funding_rate_update_interval: 300  # Update funding rates every 5 minutes
+  basis_calculation_method: "simple"  # "simple" or "weighted"
+  enable_statistical_analysis: true
+  min_liquidity_depth: 0.1       # Minimum order book depth required

@@ -1,0 +1,113 @@
+controller_name: arbitrage.gate_triangular_controller
+controller_type: GateTriangularController
+
+# Gate.io Triangular Arbitrage Controller Configuration  
+# Multi-leg arbitrage opportunities within Gate.io exchange
+
+# Market Configuration
+markets:
+  connector: gate_io
+  base_currencies:
+    - USDT
+    - BTC
+    - ETH
+    - BNB
+  quote_currencies:
+    - USDT
+    - BTC
+    - ETH
+  
+  # Trading pairs will be auto-generated from currency combinations
+  # Manual override (optional):
+  # trading_pairs:
+  #   - BTC-USDT
+  #   - ETH-USDT
+  #   - ETH-BTC
+  #   - BNB-USDT
+  #   - BNB-BTC
+
+# Profitability Settings
+profitability:
+  min_profitability_bps: 8          # Minimum profit after all costs (8 bps = 0.08%)
+  slippage_buffer_bps: 3            # Buffer for slippage per leg (3 bps = 0.03%)
+  min_spread_bps: 5                 # Minimum spread to consider opportunity
+  enable_negative_spread_detection: true  # Detect negative spreads
+
+# Position Management
+position_management:
+  max_position_size: 0.5            # Maximum position size per triangular trade
+  max_concurrent_triangulars: 2     # Maximum concurrent triangular arbitrages
+  prefer_maker_orders: true         # Prefer post-only orders when possible
+  atomic_execution: true            # Execute all legs atomically or none
+
+# Execution Settings
+execution:
+  execution_timeout: 10             # Total execution timeout (seconds)
+  leg_timeout_seconds: 5            # Timeout per leg
+  max_retries: 2                   # Maximum retry attempts per leg
+  retry_delay_seconds: 0.5         # Delay between retries
+  partial_fill_threshold: 0.9     # Accept partial fills above this ratio
+  enable_rollback: true           # Enable automatic rollback on failure
+  rollback_timeout: 15            # Timeout for rollback operations
+
+# Triangular Path Settings
+path_settings:
+  max_path_length: 3              # Standard triangular arbitrage (3 legs)
+  enable_path_optimization: true  # Optimize path selection
+  path_cache_ttl: 60             # Path cache time-to-live (seconds)
+  min_liquidity_depth: 0.1      # Minimum order book depth required
+  enable_cross_currency: true   # Enable cross-currency triangulation
+
+# Risk Management
+risk_config:
+  max_position_size: 0.5          # Hard cap on position size
+  max_symbol_exposure: 1.0        # Maximum exposure per symbol
+  max_total_exposure: 3.0         # Maximum total exposure
+  max_session_loss: 0.05          # Maximum session loss (5%)
+  max_drawdown: 0.03              # Maximum drawdown (3%)
+  kelly_multiplier: 0.2           # Kelly criterion multiplier (very conservative)
+  min_win_rate: 0.5              # Minimum required win rate
+  min_trade_count: 20            # Minimum trades before assessment
+
+# Circuit Breakers
+circuit_breakers:
+  enable_session_loss_breaker: true
+  enable_drawdown_breaker: true
+  enable_error_rate_breaker: true
+  enable_execution_failure_breaker: true
+  max_error_rate: 0.05           # Maximum error rate (5%)
+  max_execution_failure_rate: 0.1  # Maximum execution failure rate
+  error_rate_window: 50          # Window for error rate calculation
+  cooldown_minutes: 10           # Cooldown period after circuit breaker
+
+# Fee Configuration
+fee_override_path: conf/examples/conf_fee_overrides.yml
+
+# Price Monitoring
+price_monitoring:
+  price_staleness_threshold: 1    # Reject prices older than N seconds
+  price_update_interval: 0.5     # Price cache update interval
+  enable_price_validation: true  # Validate price consistency
+  max_price_deviation_bps: 100   # Maximum price deviation allowed
+
+# Monitoring & Logging
+monitoring:
+  log_level: INFO
+  enable_performance_metrics: true
+  enable_execution_tracking: true
+  enable_path_analysis: true
+  status_update_interval: 5      # Status update interval in seconds
+  
+# Advanced Settings
+advanced:
+  enable_statistical_analysis: true
+  path_profitability_history: 100  # Keep history of N path profitabilities
+  execution_latency_threshold: 2   # Alert on execution latency > N seconds
+  enable_market_impact_estimation: true
+  market_impact_threshold_bps: 2   # Estimated market impact threshold
+
+# Currency Conversion Settings
+currency_conversion:
+  base_currency: USDT            # Base currency for P&L calculation
+  enable_auto_conversion: true   # Auto-convert between currencies
+  conversion_slippage_bps: 1    # Extra slippage for currency conversion

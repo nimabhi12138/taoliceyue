@@ -1,0 +1,115 @@
+controller_name: arbitrage.gate_spot_spot_controller
+controller_type: GateSpotSpotController
+
+# Gate.io Spot-Spot Arbitrage Controller Configuration
+# Cross-market spot arbitrage with maker preference optimization
+
+# Market Configuration
+markets:
+  primary_connector: gate_io
+  secondary_connectors: []          # Add other exchanges for cross-venue arbitrage
+  trading_pairs:
+    - BTC-USDT
+    - ETH-USDT
+    - BNB-USDT
+    - ADA-USDT
+    - SOL-USDT
+    - DOT-USDT
+    - MATIC-USDT
+
+# Profitability Settings
+profitability:
+  min_profitability_bps: 8          # Minimum profit after all costs (8 bps = 0.08%)
+  slippage_buffer_bps: 3            # Buffer for slippage (3 bps = 0.03%)
+  min_spread_bps: 5                 # Minimum spread to consider opportunity
+  maker_preference_bonus_bps: 2     # Extra edge for maker orders
+
+# Position Management
+position_management:
+  max_position_size: 1.0            # Maximum position size per trade
+  max_concurrent_positions: 3       # Maximum concurrent spot arbitrages
+  prefer_maker_orders: true         # Strongly prefer post-only orders
+  enable_intra_exchange: true       # Enable intra-exchange arbitrage
+  alternative_books: []             # Alternative order books or market segments
+
+# Execution Settings  
+execution:
+  order_timeout_seconds: 30         # Order timeout before cancellation
+  max_retries: 3                   # Maximum retry attempts
+  retry_delay_seconds: 1           # Delay between retries
+  partial_fill_threshold: 0.8     # Accept partial fills above this ratio
+  enable_post_only: true          # Use post-only orders when possible
+  ioc_fallback: true              # Use IOC if post-only fails
+  simultaneous_execution: true     # Execute both legs simultaneously
+
+# Cross-Exchange Settings
+cross_exchange:
+  enable_cross_venue: false        # Enable cross-venue arbitrage
+  max_price_age_seconds: 2         # Maximum age of price data
+  transfer_time_buffer: 300        # Buffer for inter-exchange transfers (seconds)
+  min_transfer_amount: 10          # Minimum transfer amount
+  enable_transfer_optimization: false  # Optimize transfer timing
+
+# Risk Management
+risk_config:
+  max_position_size: 1.0           # Hard cap on position size
+  max_symbol_exposure: 2.0         # Maximum exposure per symbol
+  max_total_exposure: 5.0          # Maximum total exposure
+  max_session_loss: 0.08           # Maximum session loss (8%)
+  max_drawdown: 0.04               # Maximum drawdown (4%)
+  kelly_multiplier: 0.25           # Kelly criterion multiplier
+  min_win_rate: 0.45              # Minimum required win rate
+  min_trade_count: 15             # Minimum trades before assessment
+
+# Circuit Breakers
+circuit_breakers:
+  enable_session_loss_breaker: true
+  enable_drawdown_breaker: true
+  enable_error_rate_breaker: true
+  enable_liquidity_breaker: true
+  max_error_rate: 0.08            # Maximum error rate (8%)
+  error_rate_window: 100          # Window for error rate calculation
+  min_liquidity_threshold: 0.05  # Minimum liquidity required
+  cooldown_minutes: 12            # Cooldown period after circuit breaker
+
+# Fee Configuration  
+fee_override_path: conf/examples/conf_fee_overrides.yml
+
+# Price Monitoring
+price_monitoring:
+  price_staleness_threshold: 2    # Reject prices older than N seconds
+  price_update_interval: 0.5     # Price cache update interval
+  enable_price_validation: true  # Validate price consistency
+  cross_exchange_latency_threshold: 1  # Max latency between exchanges
+
+# Order Book Analysis
+order_book_analysis:
+  enable_depth_analysis: true     # Analyze order book depth
+  min_depth_levels: 3            # Minimum depth levels to analyze
+  depth_weight_factor: 0.8      # Weight factor for deeper levels
+  enable_imbalance_detection: true  # Detect order book imbalances
+  imbalance_threshold: 0.3       # Imbalance threshold for signals
+
+# Monitoring & Logging
+monitoring:
+  log_level: INFO
+  enable_performance_metrics: true
+  enable_spread_tracking: true
+  enable_execution_analysis: true
+  status_update_interval: 10     # Status update interval in seconds
+
+# Advanced Settings
+advanced:
+  enable_statistical_analysis: true
+  spread_history_length: 200     # Keep history of N spread observations
+  enable_volatility_adjustment: true  # Adjust for market volatility
+  volatility_lookback_minutes: 30    # Volatility calculation window
+  enable_correlation_analysis: false  # Analyze price correlations
+  correlation_threshold: 0.95        # Minimum correlation for arbitrage
+
+# Market Making Integration (Optional)
+market_making:
+  enable_hybrid_mode: false      # Enable market making while waiting for arb
+  mm_spread_bps: 4              # Market making spread
+  mm_order_refresh_seconds: 30  # Refresh market making orders
+  mm_max_position: 0.2          # Maximum market making position
