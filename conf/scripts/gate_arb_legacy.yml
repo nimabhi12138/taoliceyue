@@ -1,0 +1,5 @@
+# Minimal legacy script config for GateArbLegacy demo
+script_name: gate_arb_legacy
+params:
+  note: "This is a legacy demo; use v2 controllers for production."
+  log_level: INFO
