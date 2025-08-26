@@ -22,6 +22,12 @@ class GateArbLegacy(ScriptStrategyBase):
     Implements simple spot-perp basis arbitrage
     """
     
+    # Required: Define markets that this script will use
+    markets = {
+        "gate_io": ["BTC-USDT", "ETH-USDT"],
+        "gate_io_perpetual": ["BTC-USDT", "ETH-USDT"]
+    }
+    
     # Default configuration
     spot_connector = "gate_io"
     perp_connector = "gate_io_perpetual"

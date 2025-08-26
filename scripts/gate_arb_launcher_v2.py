@@ -26,8 +26,10 @@ try:
     from controllers.arbitrage.gate_spot_spot_controller import GateSpotSpotController
     from controllers.arbitrage.gate_stat_arb_controller import GateStatArbController
 except ImportError as e:
-    print(f"Warning: Could not import arbitrage controllers: {e}")
-    print("Please ensure the controllers directory is in the correct location.")
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Could not import arbitrage controllers: {e}")
+    logger.warning("Please ensure the controllers directory is in the correct location.")
 
 
 class GateArbLauncherV2(ScriptStrategyBase):
