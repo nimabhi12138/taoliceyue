@@ -8,6 +8,7 @@ Supports spot-perp, spot-spot, triangular, and statistical arbitrage
 import asyncio
 import logging
 import sys
+import importlib
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -15,6 +16,19 @@ from hummingbot.core.data_type.common import TradeType
 from hummingbot.strategy.script_strategy_base import ScriptStrategyBase
 from hummingbot.connector.connector_base import ConnectorBase
 from hummingbot.core.utils.async_utils import safe_ensure_future
+
+# Add the current directory to Python path for controller imports
+sys.path.append(str(Path(__file__).parent.parent))
+
+# Import arbitrage controllers
+try:
+    from controllers.arbitrage.gate_spot_perp_controller import GateSpotPerpController
+    from controllers.arbitrage.gate_triangular_controller import GateTriangularController
+    from controllers.arbitrage.gate_spot_spot_controller import GateSpotSpotController
+    from controllers.arbitrage.gate_stat_arb_controller import GateStatArbController
+except ImportError as e:
+    print(f"Warning: Could not import arbitrage controllers: {e}")
+    print("Please ensure the controllers directory is in the correct location.")
 
 
 class GateArbLauncherV2(ScriptStrategyBase):
@@ -30,6 +44,7 @@ class GateArbLauncherV2(ScriptStrategyBase):
         self.controllers = []
         self.active_strategies = {}
         self.setup_logging()
+        self.load_controllers()
         
     def setup_logging(self):
         """Setup structured logging for arbitrage activities"""
@@ -81,3 +96,66 @@ class GateArbLauncherV2(ScriptStrategyBase):
                 controller.stop()
         super().stop(clock)
         self.logger.info("Gate.io Arbitrage Suite V2 stopped")
+    
+    def load_controllers(self):
+        """Dynamically load arbitrage controllers from configuration"""
+        try:
+            # This would typically load from the script configuration
+            # For now, create a sample configuration
+            controllers_config = [
+                {
+                    "type": "GateSpotPerpController",
+                    "config": {
+                        "spot_connector": "gate_io",
+                        "perp_connector": "gate_io_perpetual",
+                        "trading_pairs": ["BTC-USDT", "ETH-USDT"],
+                        "min_profitability_bps": 8
+                    }
+                },
+                {
+                    "type": "GateTriangularController", 
+                    "config": {
+                        "connector": "gate_io",
+                        "base_currencies": ["USDT", "BTC", "ETH"],
+                        "min_profitability_bps": 8
+                    }
+                }
+            ]
+            
+            for controller_config in controllers_config:
+                controller = self.create_controller(controller_config)
+                if controller:
+                    self.controllers.append(controller)
+                    self.logger.info(f"Loaded controller: {controller_config['type']}")
+                    
+        except Exception as e:
+            self.logger.error(f"Error loading controllers: {e}")
+    
+    def create_controller(self, config: Dict):
+        """Create a controller instance from configuration"""
+        try:
+            controller_type = config["type"]
+            controller_config = config["config"]
+            
+            # Map controller types to classes
+            controller_classes = {
+                "GateSpotPerpController": GateSpotPerpController,
+                "GateTriangularController": GateTriangularController,
+                "GateSpotSpotController": GateSpotSpotController,
+                "GateStatArbController": GateStatArbController
+            }
+            
+            if controller_type in controller_classes:
+                controller_class = controller_classes[controller_type]
+                
+                # Pass connectors to the controller config
+                controller_config["connectors"] = self.connectors
+                
+                return controller_class(controller_config)
+            else:
+                self.logger.error(f"Unknown controller type: {controller_type}")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error creating controller {config['type']}: {e}")
+            return None
