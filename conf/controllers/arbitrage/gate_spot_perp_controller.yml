@@ -1,0 +1,38 @@
+# Gate Spot–Perp Basis Arb Controller
+type: arbitrage_spot_perp
+global_fee_overrides_path: conf/examples/conf_fee_overrides.yml
+
+symbols:
+  spot_connector: gate_io
+  spot_pair: BTC-USDT
+  perp_connector: gate_io_perpetual
+  perp_pair: BTC-USDT
+  leverage: 5
+
+thresholds:
+  basis_entry_bps: 10              # enter when basis > 10 bps after costs
+  basis_exit_bps: 2                # exit threshold
+  slippage_buffer_bps: 2
+  safety_margin_bps: 1
+
+risk:
+  kelly_min: 0.00
+  kelly_max: 0.15
+  per_trade_notional_cap: 1000
+  portfolio_notional: 10000
+  volatility_bps: 50
+
+filters:
+  spot_lot_step_size: 0.0001
+  spot_min_notional: 10
+  spot_price_tick_size: 0.01
+  perp_lot_step_size: 0.001
+  perp_min_notional: 10
+  perp_price_tick_size: 0.1
+
+cooldown_seconds: 5
+
+# Debug placeholders for local dry-run (override at runtime in HB)
+debug_spot_price: 68000
+debug_perp_mark: 68100
+debug_est_position_qty: 0.001

@@ -1,0 +1,22 @@
+# Example generic script config referencing multiple controllers
+tick_interval_seconds: 1
+controllers:
+  - name: gate_spot_perp
+    module: controllers.arbitrage.gate_spot_perp_controller
+    class: GateSpotPerpController
+    config_path: conf/controllers/arbitrage/gate_spot_perp_controller.yml
+
+  - name: gate_spot_spot
+    module: controllers.arbitrage.gate_spot_spot_controller
+    class: GateSpotSpotController
+    config_path: conf/controllers/arbitrage/gate_spot_spot_controller.yml
+
+  - name: gate_triangular
+    module: controllers.arbitrage.gate_triangular_controller
+    class: GateTriangularController
+    config_path: conf/controllers/arbitrage/gate_triangular_controller.yml
+
+  - name: gate_stat_arb
+    module: controllers.arbitrage.gate_stat_arb_controller
+    class: GateStatArbController
+    config_path: conf/controllers/arbitrage/gate_stat_arb_controller.yml
