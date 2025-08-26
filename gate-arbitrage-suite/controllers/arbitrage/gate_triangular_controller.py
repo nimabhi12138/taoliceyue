@@ -1,3 +1,5 @@
+from typing import List
+from typing import Optional
 """
 Gate.io Triangular Arbitrage Controller
 Implements triangular arbitrage with net-fee edge calculation
@@ -12,6 +14,8 @@ from datetime import datetime
 import networkx as nx
 
 from hummingbot.core.data_type.common import OrderType, TradeType
+from hummingbot.smart_components.models.executor_actions import ExecutorAction, CreateExecutorAction, StopExecutorAction
+
 from hummingbot.smart_components.controllers.controller_base import ControllerBase, ControllerConfigBase
 from hummingbot.smart_components.executors.position_executor import PositionExecutor
 from hummingbot.core.event.events import OrderFilledEvent, OrderCancelledEvent
@@ -36,6 +40,7 @@ class GateTriangularControllerConfig(ControllerConfigBase):
     """Configuration for Triangular Arbitrage Controller"""
     
     controller_name: str = "gate_triangular_controller"
+    controller_type: str = "directional"
     connector: str = Field(default="gate_io", description="Connector name")
     
     # Base currencies for triangular paths
@@ -98,7 +103,7 @@ class GateTriangularControllerConfig(ControllerConfigBase):
     taker_fee_bps: Decimal = Field(default=Decimal("5.0"))  # 0.05% with 75% rebate
     
     @validator("symbols")
-    def validate_symbols(cls, v):
+    def validate_symbols(cls, v) -> bool:
         if len(v) < 3:
             raise ValueError("Need at least 3 symbols for triangular arbitrage")
         return v
@@ -141,7 +146,7 @@ class GateTriangularController(ControllerBase):
         self._failed_arbs = 0
         self._avg_execution_time = 0
         
-    async def start(self):
+    async def start(self) -> None:
         """Initialize the controller"""
         await super().start()
         self.logger.info(f"Starting {self.config.controller_name}")
@@ -156,7 +161,7 @@ class GateTriangularController(ControllerBase):
         asyncio.create_task(self._monitor_opportunities())
         asyncio.create_task(self._monitor_executions())
         
-    async def stop(self):
+    async def stop(self) -> None:
         """Cleanup on stop"""
         self.logger.info(f"Stopping {self.config.controller_name}")
         
@@ -166,7 +171,7 @@ class GateTriangularController(ControllerBase):
             
         await super().stop()
         
-    async def _load_fee_overrides(self):
+    async def _load_fee_overrides(self) -> None:
         """Load fee overrides from conf_fee_overrides.yml"""
         try:
             import yaml
@@ -183,7 +188,7 @@ class GateTriangularController(ControllerBase):
         except Exception as e:
             self.logger.warning(f"Could not load fee overrides: {e}")
             
-    def _build_market_graph(self):
+    def _build_market_graph(self) -> None:
         """Build directed graph of market relationships"""
         self._market_graph.clear()
         
@@ -205,7 +210,7 @@ class GateTriangularController(ControllerBase):
         self.logger.info(f"Built market graph with {len(self._market_graph.nodes)} currencies "
                         f"and {len(self._market_graph.edges)} edges")
         
-    async def _monitor_opportunities(self):
+    async def _monitor_opportunities(self) -> None:
         """Monitor for triangular arbitrage opportunities"""
         while self.is_active:
             try:
@@ -348,7 +353,7 @@ class GateTriangularController(ControllerBase):
                 
         return min_size
         
-    async def _execute_arbitrage(self, path: TriangularPath):
+    async def _execute_arbitrage(self, path: TriangularPath) -> None:
         """Execute triangular arbitrage atomically"""
         try:
             arb_id = f"tri_{datetime.now().timestamp()}"
@@ -453,13 +458,13 @@ class GateTriangularController(ControllerBase):
             
         return False
         
-    async def _cancel_arbitrage(self, arb: ActiveArbitrage):
+    async def _cancel_arbitrage(self, arb: ActiveArbitrage) -> None:
         """Cancel all legs of an arbitrage"""
         for executor in arb.executors:
             if executor.is_active:
                 await executor.early_stop()
                 
-    async def _monitor_executions(self):
+    async def _monitor_executions(self) -> None:
         """Monitor active arbitrage executions"""
         while self.is_active:
             try:
@@ -494,11 +499,31 @@ class GateTriangularController(ControllerBase):
         """Format controller status for display"""
         lines = []
         lines.append(f"\n{'=' * 50}")
-        lines.append(f"Triangular Arbitrage Controller Status")
+    async def update_processed_data(self) -> None:
+        """
+        V2 Framework: Update processed data periodically
+        """
+        # Update any cached data here
+        pass
         lines.append(f"{'=' * 50}")
+    async def determine_executor_actions(self) -> List[ExecutorAction]:
+        """
+        V2 Framework: Determine what executors to create/stop
+        """
+        actions = []
+        # Add logic to create executor actions
+        return actions
         
         # Active arbitrages
-        lines.append(f"Active Arbitrages: {len(self._active_arbs)}/{self.config.max_concurrent_arbs}")
+        lines.append(f"Active Arbitrages: {len(self._active_arbs)}")
+    def to_format_status(self) -> List[str]:
+        """
+        V2 Framework: Format status for display
+        """
+        lines = []
+        lines.append(f"Controller: {self.config.controller_name}")
+        lines.append(f"Status: {'Active' if self.is_active else 'Inactive'}")
+        return lines
         
         for arb_id, arb in self._active_arbs.items():
             path_str = " -> ".join(arb.path.pairs)

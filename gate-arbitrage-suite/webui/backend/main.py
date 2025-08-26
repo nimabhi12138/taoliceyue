@@ -1,3 +1,5 @@
+from typing import List
+from typing import Optional
 """
 FastAPI Backend for Gate.io Arbitrage Suite Web UI
 Provides REST API for managing arbitrage strategies
@@ -295,7 +297,7 @@ async def get_bot_status(username: str = Depends(verify_credentials)):
                             try:
                                 pnl_str = line.split("Total PnL:")[1].split()[0]
                                 status_data["total_pnl"] = float(pnl_str.replace("$", ""))
-                            except:
+                            except Exception:
                                 pass
                                 
         return status_data

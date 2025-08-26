@@ -1,3 +1,5 @@
+from typing import List
+from typing import Optional
 """
 Gate.io Spot-Perpetual Basis Arbitrage Controller
 Implements cash-and-carry arbitrage between spot and perpetual markets
@@ -11,6 +13,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from hummingbot.core.data_type.common import OrderType, PositionAction, PositionSide, TradeType
+from hummingbot.smart_components.models.executor_actions import ExecutorAction, CreateExecutorAction, StopExecutorAction
+
 from hummingbot.smart_components.controllers.controller_base import ControllerBase, ControllerConfigBase
 from hummingbot.smart_components.executors.arbitrage_executor import ArbitrageExecutor
 from hummingbot.smart_components.models.executors import CloseType
@@ -26,6 +30,7 @@ class GateSpotPerpControllerConfig(ControllerConfigBase):
     """Configuration for Spot-Perp Arbitrage Controller"""
     
     controller_name: str = "gate_spot_perp_controller"
+    controller_type: str = "directional"
     spot_connector: str = Field(default="gate_io", description="Spot connector name")
     perp_connector: str = Field(default="gate_io_perpetual", description="Perpetual connector name")
     
@@ -100,7 +105,7 @@ class GateSpotPerpControllerConfig(ControllerConfigBase):
     perp_taker_fee_bps: Decimal = Field(default=Decimal("1.5"))  # 0.015% with 75% rebate
     
     @validator("min_basis_bps")
-    def validate_min_basis(cls, v):
+    def validate_min_basis(cls, v) -> bool:
         if v <= 0:
             raise ValueError("min_basis_bps must be positive")
         return v
@@ -145,7 +150,7 @@ class GateSpotPerpController(ControllerBase):
         self._total_pnl_bps = Decimal("0")
         self._avg_slippage_bps = Decimal("0")
         
-    async def start(self):
+    async def start(self) -> None:
         """Initialize the controller"""
         await super().start()
         self.logger.info(f"Starting {self.config.controller_name}")
@@ -158,7 +163,7 @@ class GateSpotPerpController(ControllerBase):
         asyncio.create_task(self._monitor_positions())
         asyncio.create_task(self._update_funding_rates())
         
-    async def stop(self):
+    async def stop(self) -> None:
         """Cleanup on stop"""
         self.logger.info(f"Stopping {self.config.controller_name}")
         
@@ -169,7 +174,7 @@ class GateSpotPerpController(ControllerBase):
                 
         await super().stop()
         
-    async def _load_fee_overrides(self):
+    async def _load_fee_overrides(self) -> None:
         """Load fee overrides from conf_fee_overrides.yml"""
         try:
             import yaml
@@ -191,7 +196,7 @@ class GateSpotPerpController(ControllerBase):
         except Exception as e:
             self.logger.warning(f"Could not load fee overrides: {e}")
             
-    async def _monitor_opportunities(self):
+    async def _monitor_opportunities(self) -> None:
         """Monitor for arbitrage opportunities"""
         while self.is_active:
             try:
@@ -308,7 +313,7 @@ class GateSpotPerpController(ControllerBase):
             self.logger.error(f"Error calculating position size: {e}")
             return Decimal("0")
             
-    async def _execute_opportunity(self, opportunity: ArbitrageOpportunity):
+    async def _execute_opportunity(self, opportunity: ArbitrageOpportunity) -> None:
         """Execute an arbitrage opportunity"""
         try:
             # Check circuit breaker
@@ -371,7 +376,7 @@ class GateSpotPerpController(ControllerBase):
         except Exception as e:
             self.logger.error(f"Error executing opportunity: {e}")
             
-    async def _monitor_positions(self):
+    async def _monitor_positions(self) -> None:
         """Monitor and rebalance active positions"""
         while self.is_active:
             try:
@@ -393,7 +398,7 @@ class GateSpotPerpController(ControllerBase):
                 self.logger.error(f"Error monitoring positions: {e}")
                 await asyncio.sleep(10)
                 
-    async def _check_rebalance(self, executor: ArbitrageExecutor):
+    async def _check_rebalance(self, executor: ArbitrageExecutor) -> None:
         """Check if position needs rebalancing"""
         try:
             # Get current positions
@@ -411,7 +416,7 @@ class GateSpotPerpController(ControllerBase):
         except Exception as e:
             self.logger.error(f"Error checking rebalance: {e}")
             
-    async def _update_funding_rates(self):
+    async def _update_funding_rates(self) -> None:
         """Update funding rates periodically"""
         while self.is_active:
             try:
@@ -430,7 +435,7 @@ class GateSpotPerpController(ControllerBase):
                 self.logger.error(f"Error updating funding rates: {e}")
                 await asyncio.sleep(300)
                 
-    def _update_metrics(self, executor: ArbitrageExecutor):
+    def _update_metrics(self, executor: ArbitrageExecutor) -> None:
         """Update performance metrics"""
         try:
             pnl = executor.get_net_pnl_quote()
@@ -446,7 +451,7 @@ class GateSpotPerpController(ControllerBase):
         except Exception as e:
             self.logger.error(f"Error updating metrics: {e}")
             
-    async def _check_circuit_breakers(self):
+    async def _check_circuit_breakers(self) -> None:
         """Check if circuit breakers should be triggered"""
         try:
             # Session loss limit
@@ -468,11 +473,31 @@ class GateSpotPerpController(ControllerBase):
         """Format controller status for display"""
         lines = []
         lines.append(f"\n{'=' * 50}")
-        lines.append(f"Spot-Perp Arbitrage Controller Status")
+    async def update_processed_data(self) -> None:
+        """
+        V2 Framework: Update processed data periodically
+        """
+        # Update any cached data here
+        pass
         lines.append(f"{'=' * 50}")
+    async def determine_executor_actions(self) -> List[ExecutorAction]:
+        """
+        V2 Framework: Determine what executors to create/stop
+        """
+        actions = []
+        # Add logic to create executor actions
+        return actions
         
         # Active positions
-        lines.append(f"Active Positions: {len(self._active_executors)}/{self.config.max_open_positions}")
+        lines.append(f"Active Positions: {len(self._active_executors)}")
+    def to_format_status(self) -> List[str]:
+        """
+        V2 Framework: Format status for display
+        """
+        lines = []
+        lines.append(f"Controller: {self.config.controller_name}")
+        lines.append(f"Status: {'Active' if self.is_active else 'Inactive'}")
+        return lines
         
         for executor_id, executor in self._active_executors.items():
             symbol = executor.config.trading_pair

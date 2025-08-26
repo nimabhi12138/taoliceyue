@@ -1,3 +1,4 @@
+from typing import List
 """
 Streamlit Frontend for Gate.io Arbitrage Suite
 User-friendly interface for managing arbitrage strategies
@@ -40,7 +41,7 @@ def authenticate(username: str, password: str) -> bool:
             auth=(username, password)
         )
         return response.status_code == 200
-    except:
+    except Exception:
         return False
 
 # API Helper Functions
@@ -376,7 +377,7 @@ gate_io_perpetual:
                 st.success("Risk settings saved")
 
 # Main App
-def main():
+def main() -> None:
     """Main application"""
     if not st.session_state.authenticated:
         login_page()

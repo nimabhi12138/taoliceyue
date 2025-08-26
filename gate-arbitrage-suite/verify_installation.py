@@ -1,3 +1,4 @@
+from typing import Optional
 #!/usr/bin/env python3
 """
 Gate.io Arbitrage Suite - Installation Verification Script
@@ -10,6 +11,9 @@ import importlib
 import yaml
 from pathlib import Path
 from decimal import Decimal
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Colors:
@@ -22,26 +26,26 @@ class Colors:
     BOLD = '\033[1m'
 
 
-def print_header(text):
+def print_header(text) -> None:
     """Print a section header"""
-    print(f"\n{Colors.BOLD}{Colors.BLUE}{'='*50}{Colors.ENDC}")
-    print(f"{Colors.BOLD}{Colors.BLUE}{text}{Colors.ENDC}")
-    print(f"{Colors.BOLD}{Colors.BLUE}{'='*50}{Colors.ENDC}")
+    logger.info(f"\n{Colors.BOLD}{Colors.BLUE}{'='*50}{Colors.ENDC}")
+    logger.info(f"{Colors.BOLD}{Colors.BLUE}{text}{Colors.ENDC}")
+    logger.info(f"{Colors.BOLD}{Colors.BLUE}{'='*50}{Colors.ENDC}")
 
 
-def print_success(text):
+def print_success(text) -> None:
     """Print success message"""
-    print(f"{Colors.GREEN}✓ {text}{Colors.ENDC}")
+    logger.info(f"{Colors.GREEN}✓ {text}{Colors.ENDC}")
 
 
-def print_warning(text):
+def print_warning(text) -> None:
     """Print warning message"""
-    print(f"{Colors.YELLOW}⚠ {text}{Colors.ENDC}")
+    logger.info(f"{Colors.YELLOW}⚠ {text}{Colors.ENDC}")
 
 
-def print_error(text):
+def print_error(text) -> None:
     """Print error message"""
-    print(f"{Colors.RED}✗ {text}{Colors.ENDC}")
+    logger.info(f"{Colors.RED}✗ {text}{Colors.ENDC}")
 
 
 def check_python_version():
@@ -100,7 +104,7 @@ def check_hummingbot_installation():
             return hummingbot_dir
         else:
             print_error("Hummingbot not found. Please install Hummingbot first")
-            print("  Visit: https://hummingbot.org/installation/")
+            logger.info("  Visit: https://hummingbot.org/installation/")
             return None
             
     except Exception as e:
@@ -135,7 +139,7 @@ def check_required_packages():
     
     if missing_packages:
         print_warning(f"\nInstall missing packages with:")
-        print(f"  pip install {' '.join(missing_packages)}")
+        logger.info(f"  pip install {' '.join(missing_packages)}")
         return False
     
     return True
@@ -170,7 +174,7 @@ def check_suite_files():
     all_present = True
     
     for category, files in required_files.items():
-        print(f"\n{category}:")
+        logger.info(f"\n{category}:")
         for file in files:
             if os.path.exists(file):
                 print_success(f"  {file}")
@@ -201,9 +205,9 @@ def check_fee_configuration():
             maker_fee = Decimal(str(spot_fees.get("maker_fee", 0)))
             taker_fee = Decimal(str(spot_fees.get("taker_fee", 0)))
             
-            print(f"Gate.io Spot Fees:")
-            print(f"  Maker: {maker_fee*100:.4f}% ({maker_fee*10000:.1f} bps)")
-            print(f"  Taker: {taker_fee*100:.4f}% ({taker_fee*10000:.1f} bps)")
+            logger.info(f"Gate.io Spot Fees:")
+            logger.info(f"  Maker: {maker_fee*100:.4f}% ({maker_fee*10000:.1f} bps)")
+            logger.info(f"  Taker: {taker_fee*100:.4f}% ({taker_fee*10000:.1f} bps)")
             
             # Check if 75% rebate is applied
             if maker_fee <= Decimal("0.00025") and taker_fee <= Decimal("0.0005"):
@@ -217,9 +221,9 @@ def check_fee_configuration():
             maker_fee = Decimal(str(perp_fees.get("maker_fee", 0)))
             taker_fee = Decimal(str(perp_fees.get("taker_fee", 0)))
             
-            print(f"\nGate.io Perpetual Fees:")
-            print(f"  Maker: {maker_fee*100:.4f}% ({maker_fee*10000:.1f} bps)")
-            print(f"  Taker: {taker_fee*100:.4f}% ({taker_fee*10000:.1f} bps)")
+            logger.info(f"\nGate.io Perpetual Fees:")
+            logger.info(f"  Maker: {maker_fee*100:.4f}% ({maker_fee*10000:.1f} bps)")
+            logger.info(f"  Taker: {taker_fee*100:.4f}% ({taker_fee*10000:.1f} bps)")
             
             if maker_fee <= Decimal("0.00005") and taker_fee <= Decimal("0.00015"):
                 print_success("  75% rebate appears to be configured")
@@ -244,13 +248,13 @@ def check_docker_installation():
         print_success("Docker is installed")
     else:
         print_warning("Docker not installed - Web UI will not be available")
-        print("  Install with: sudo apt-get install docker.io")
+        logger.info("  Install with: sudo apt-get install docker.io")
     
     if docker_compose_installed:
         print_success("Docker Compose is installed")
     else:
         print_warning("Docker Compose not installed - Web UI will not be available")
-        print("  Install with: sudo apt-get install docker-compose")
+        logger.info("  Install with: sudo apt-get install docker-compose")
     
     return docker_installed and docker_compose_installed
 
@@ -262,30 +266,30 @@ def generate_installation_commands(hummingbot_dir):
     if not hummingbot_dir:
         hummingbot_dir = "~/hummingbot"
     
-    print("If files are missing, run these commands:\n")
-    print(f"# Set Hummingbot directory")
-    print(f"export HUMMINGBOT_DIR={hummingbot_dir}")
-    print()
-    print(f"# Copy controllers")
-    print(f"cp -r controllers/* $HUMMINGBOT_DIR/hummingbot/smart_components/controllers/")
-    print()
-    print(f"# Copy scripts")
-    print(f"cp scripts/* $HUMMINGBOT_DIR/scripts/")
-    print()
-    print(f"# Copy configurations")
-    print(f"cp -r conf/* $HUMMINGBOT_DIR/conf/")
-    print()
-    print(f"# Copy utilities")
-    print(f"cp -r utils/* $HUMMINGBOT_DIR/hummingbot/smart_components/utils/")
+    logger.info("If files are missing, run these commands:\n")
+    logger.info(f"# Set Hummingbot directory")
+    logger.info(f"export HUMMINGBOT_DIR={hummingbot_dir}")
+    logger.info()
+    logger.info(f"# Copy controllers")
+    logger.info(f"cp -r controllers/* $HUMMINGBOT_DIR/hummingbot/smart_components/controllers/")
+    logger.info()
+    logger.info(f"# Copy scripts")
+    logger.info(f"cp scripts/* $HUMMINGBOT_DIR/scripts/")
+    logger.info()
+    logger.info(f"# Copy configurations")
+    logger.info(f"cp -r conf/* $HUMMINGBOT_DIR/conf/")
+    logger.info()
+    logger.info(f"# Copy utilities")
+    logger.info(f"cp -r utils/* $HUMMINGBOT_DIR/hummingbot/smart_components/utils/")
 
 
-def main():
+def main() -> None:
     """Main verification function"""
-    print(f"{Colors.BOLD}")
-    print("=" * 60)
-    print("  GATE.IO ARBITRAGE SUITE - INSTALLATION VERIFICATION")
-    print("=" * 60)
-    print(f"{Colors.ENDC}")
+    logger.info(f"{Colors.BOLD}")
+    logger.info("=" * 60)
+    logger.info("  GATE.IO ARBITRAGE SUITE - INSTALLATION VERIFICATION")
+    logger.info("=" * 60)
+    logger.info(f"{Colors.ENDC}")
     
     checks_passed = []
     
@@ -310,17 +314,17 @@ def main():
     
     if passed == total:
         print_success(f"All checks passed! ({passed}/{total})")
-        print("\n🎉 Your Gate.io Arbitrage Suite is ready to use!")
-        print("\nNext steps:")
-        print("1. Start Hummingbot")
-        print("2. Connect to Gate.io with: connect gate_io")
-        print("3. Start arbitrage with: start --script gate_arb_v2.py")
+        logger.info("\n🎉 Your Gate.io Arbitrage Suite is ready to use!")
+        logger.info("\nNext steps:")
+        logger.info("1. Start Hummingbot")
+        logger.info("2. Connect to Gate.io with: connect gate_io")
+        logger.info("3. Start arbitrage with: start --script gate_arb_v2.py")
     else:
         print_error(f"Some checks failed ({passed}/{total})")
-        print("\n⚠️  Please fix the issues above before running the arbitrage suite")
+        logger.info("\n⚠️  Please fix the issues above before running the arbitrage suite")
         generate_installation_commands(hummingbot_dir)
     
-    print("\n" + "=" * 60)
+    logger.info("\n" + "=" * 60)
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ import networkx as nx
 class TestTriangularArbitrage(unittest.TestCase):
     """Test triangular arbitrage path calculations"""
     
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test graph and parameters"""
         self.graph = nx.DiGraph()
         
@@ -31,7 +31,7 @@ class TestTriangularArbitrage(unittest.TestCase):
         # Fee with 75% rebate
         self.taker_fee = Decimal("0.0005")  # 0.05% after rebate
         
-    def test_find_triangular_cycles(self):
+    def test_find_triangular_cycles(self) -> None:
         """Test finding triangular cycles in market graph"""
         # Find all cycles starting and ending at USDT
         cycles = list(nx.simple_cycles(self.graph))
@@ -49,7 +49,7 @@ class TestTriangularArbitrage(unittest.TestCase):
                 break
         self.assertTrue(found)
         
-    def test_calculate_path_profit(self):
+    def test_calculate_path_profit(self) -> None:
         """Test calculating profit for a triangular path"""
         # Path: USDT -> BTC -> ETH -> USDT
         path = ["USDT", "BTC", "ETH", "USDT"]
@@ -86,7 +86,7 @@ class TestTriangularArbitrage(unittest.TestCase):
         # 3 legs * 5 bps = 15 bps loss
         self.assertAlmostEqual(float(profit_bps), -15, places=1)
         
-    def test_profitable_path_detection(self):
+    def test_profitable_path_detection(self) -> None:
         """Test detecting profitable triangular paths"""
         # Add an inefficient market (arbitrage opportunity)
         self.graph["ETH"]["USDT"]["rate"] = 3100  # ETH overpriced
@@ -118,7 +118,7 @@ class TestTriangularArbitrage(unittest.TestCase):
         # This is a simplified example
         self.assertIsNotNone(profit_bps)
         
-    def test_atomic_execution_requirement(self):
+    def test_atomic_execution_requirement(self) -> None:
         """Test atomic execution requirements for triangular arbitrage"""
         # All three legs must execute or none
         legs = [
@@ -146,7 +146,7 @@ class TestTriangularArbitrage(unittest.TestCase):
         # All legs should be rolled back
         self.assertTrue(all(not leg["executed"] for leg in legs))
         
-    def test_minimum_profit_threshold(self):
+    def test_minimum_profit_threshold(self) -> None:
         """Test minimum profit threshold after fees"""
         min_profit_bps = Decimal("20")  # 20 bps minimum
         

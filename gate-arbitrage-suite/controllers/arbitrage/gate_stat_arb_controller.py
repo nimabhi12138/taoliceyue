@@ -1,3 +1,5 @@
+from typing import List
+from typing import Optional
 """
 Gate.io Statistical Arbitrage Controller
 Implements mean-reversion pairs trading with cointegration analysis
@@ -13,6 +15,8 @@ from datetime import datetime, timedelta
 from collections import deque
 
 from hummingbot.core.data_type.common import OrderType, TradeType
+from hummingbot.smart_components.models.executor_actions import ExecutorAction, CreateExecutorAction, StopExecutorAction
+
 from hummingbot.smart_components.controllers.controller_base import ControllerBase, ControllerConfigBase
 from hummingbot.smart_components.executors.position_executor import PositionExecutor
 from pydantic import Field, validator
@@ -24,6 +28,7 @@ class GateStatArbControllerConfig(ControllerConfigBase):
     """Configuration for Statistical Arbitrage Controller"""
     
     controller_name: str = "gate_stat_arb_controller"
+    controller_type: str = "directional"
     connector: str = Field(default="gate_io")
     
     # Trading pairs
@@ -88,7 +93,7 @@ class GateStatArbController(ControllerBase):
         self._total_trades = 0
         self._winning_trades = 0
         
-    async def start(self):
+    async def start(self) -> None:
         """Initialize the controller"""
         await super().start()
         self.logger.info(f"Starting {self.config.controller_name}")
@@ -100,7 +105,7 @@ class GateStatArbController(ControllerBase):
         asyncio.create_task(self._monitor_signals())
         asyncio.create_task(self._monitor_positions())
         
-    async def stop(self):
+    async def stop(self) -> None:
         """Cleanup on stop"""
         self.logger.info(f"Stopping {self.config.controller_name}")
         
@@ -112,7 +117,7 @@ class GateStatArbController(ControllerBase):
                     
         await super().stop()
         
-    async def _load_fee_overrides(self):
+    async def _load_fee_overrides(self) -> None:
         """Load fee overrides"""
         try:
             import yaml
@@ -127,7 +132,7 @@ class GateStatArbController(ControllerBase):
         except Exception as e:
             self.logger.warning(f"Could not load fee overrides: {e}")
             
-    async def _initialize_price_history(self):
+    async def _initialize_price_history(self) -> None:
         """Initialize price history for all pairs"""
         for pair_config in self.config.pairs:
             asset1 = pair_config["asset1"]
@@ -140,7 +145,7 @@ class GateStatArbController(ControllerBase):
             await self._load_historical_prices(asset1)
             await self._load_historical_prices(asset2)
             
-    async def _load_historical_prices(self, symbol: str):
+    async def _load_historical_prices(self, symbol: str) -> None:
         """Load historical prices for a symbol"""
         try:
             connector = self.connectors[self.config.connector]
@@ -153,7 +158,7 @@ class GateStatArbController(ControllerBase):
         except Exception as e:
             self.logger.error(f"Error loading historical prices for {symbol}: {e}")
             
-    async def _update_statistics(self):
+    async def _update_statistics(self) -> None:
         """Update pair statistics periodically"""
         while self.is_active:
             try:
@@ -240,7 +245,7 @@ class GateStatArbController(ControllerBase):
             
         return 50  # Default half-life
         
-    async def _monitor_signals(self):
+    async def _monitor_signals(self) -> None:
         """Monitor for trading signals"""
         while self.is_active:
             try:
@@ -276,7 +281,7 @@ class GateStatArbController(ControllerBase):
                 self.logger.error(f"Error monitoring signals: {e}")
                 await asyncio.sleep(10)
                 
-    async def _enter_position(self, pair_id: str, asset1: str, asset2: str, stats: PairStats):
+    async def _enter_position(self, pair_id: str, asset1: str, asset2: str, stats: PairStats) -> None:
         """Enter a statistical arbitrage position"""
         try:
             if len(self._active_positions) >= self.config.max_open_pairs:
@@ -354,7 +359,7 @@ class GateStatArbController(ControllerBase):
         except Exception as e:
             self.logger.error(f"Error entering position: {e}")
             
-    async def _exit_position(self, pair_id: str):
+    async def _exit_position(self, pair_id: str) -> None:
         """Exit a statistical arbitrage position"""
         try:
             if pair_id not in self._active_positions:
@@ -380,7 +385,7 @@ class GateStatArbController(ControllerBase):
         except Exception as e:
             self.logger.error(f"Error exiting position: {e}")
             
-    async def _monitor_positions(self):
+    async def _monitor_positions(self) -> None:
         """Monitor active positions"""
         while self.is_active:
             try:
@@ -404,10 +409,30 @@ class GateStatArbController(ControllerBase):
         """Format controller status"""
         lines = []
         lines.append(f"\n{'=' * 50}")
-        lines.append(f"Statistical Arbitrage Controller Status")
+    async def update_processed_data(self) -> None:
+        """
+        V2 Framework: Update processed data periodically
+        """
+        # Update any cached data here
+        pass
         lines.append(f"{'=' * 50}")
+    async def determine_executor_actions(self) -> List[ExecutorAction]:
+        """
+        V2 Framework: Determine what executors to create/stop
+        """
+        actions = []
+        # Add logic to create executor actions
+        return actions
         
-        lines.append(f"Active Positions: {len(self._active_positions)}/{self.config.max_open_pairs}")
+        lines.append(f"Active Positions: {len(self._active_positions)}")
+    def to_format_status(self) -> List[str]:
+        """
+        V2 Framework: Format status for display
+        """
+        lines = []
+        lines.append(f"Controller: {self.config.controller_name}")
+        lines.append(f"Status: {'Active' if self.is_active else 'Inactive'}")
+        return lines
         
         for pair_id, executors in self._active_positions.items():
             pnl = sum(e.get_net_pnl_quote() for e in executors)

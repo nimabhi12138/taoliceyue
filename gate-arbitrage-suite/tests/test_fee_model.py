@@ -9,7 +9,7 @@ from decimal import Decimal
 class TestFeeModel(unittest.TestCase):
     """Test fee calculations with rebates"""
     
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test parameters"""
         self.rebate_ratio = Decimal("0.75")
         
@@ -23,31 +23,31 @@ class TestFeeModel(unittest.TestCase):
         """Calculate net fee after rebate"""
         return raw_fee * (1 - rebate)
         
-    def test_spot_maker_fee_with_rebate(self):
+    def test_spot_maker_fee_with_rebate(self) -> None:
         """Test spot maker fee with 75% rebate"""
         net_fee = self.calculate_net_fee(self.spot_maker_fee, self.rebate_ratio)
         expected = Decimal("0.00025")  # 0.025%
         self.assertEqual(net_fee, expected)
         
-    def test_spot_taker_fee_with_rebate(self):
+    def test_spot_taker_fee_with_rebate(self) -> None:
         """Test spot taker fee with 75% rebate"""
         net_fee = self.calculate_net_fee(self.spot_taker_fee, self.rebate_ratio)
         expected = Decimal("0.0005")  # 0.05%
         self.assertEqual(net_fee, expected)
         
-    def test_perp_maker_fee_with_rebate(self):
+    def test_perp_maker_fee_with_rebate(self) -> None:
         """Test perpetual maker fee with 75% rebate"""
         net_fee = self.calculate_net_fee(self.perp_maker_fee, self.rebate_ratio)
         expected = Decimal("0.00005")  # 0.005%
         self.assertEqual(net_fee, expected)
         
-    def test_perp_taker_fee_with_rebate(self):
+    def test_perp_taker_fee_with_rebate(self) -> None:
         """Test perpetual taker fee with 75% rebate"""
         net_fee = self.calculate_net_fee(self.perp_taker_fee, self.rebate_ratio)
         expected = Decimal("0.00015")  # 0.015%
         self.assertEqual(net_fee, expected)
         
-    def test_arbitrage_profitability(self):
+    def test_arbitrage_profitability(self) -> None:
         """Test arbitrage profitability calculation"""
         # Spot-Perp arbitrage example
         basis_bps = Decimal("50")  # 50 bps spread
@@ -68,7 +68,7 @@ class TestFeeModel(unittest.TestCase):
         self.assertGreater(net_edge_bps, 0)
         self.assertAlmostEqual(float(net_edge_bps), 28.5, places=1)
         
-    def test_triangular_fee_calculation(self):
+    def test_triangular_fee_calculation(self) -> None:
         """Test triangular arbitrage fee calculation"""
         # Three legs, each with fees
         leg1_fee = self.calculate_net_fee(self.spot_taker_fee, self.rebate_ratio)
@@ -82,7 +82,7 @@ class TestFeeModel(unittest.TestCase):
         # With 75% rebate, total fees should be 15 bps (3 * 5 bps)
         self.assertEqual(total_fees_bps, Decimal("15"))
         
-    def test_maker_vs_taker_comparison(self):
+    def test_maker_vs_taker_comparison(self) -> None:
         """Test cost difference between maker and taker orders"""
         # Spot market
         spot_maker_net = self.calculate_net_fee(self.spot_maker_fee, self.rebate_ratio)

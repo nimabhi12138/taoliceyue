@@ -1,3 +1,5 @@
+from typing import List
+from typing import Optional
 """
 Gate.io Arbitrage Legacy Script
 ScriptStrategyBase implementation for backward compatibility
@@ -24,7 +26,7 @@ class GateArbLegacy(ScriptStrategyBase):
     
     # Markets to monitor
     markets = {
-        "gate_io": ["BTC-USDT", "ETH-USDT", "BNB-USDT"],
+        self.config.spot_connector_name if hasattr(self, "config") else "gate_io": ["BTC-USDT", "ETH-USDT", "BNB-USDT"],
         "gate_io_perpetual": ["BTC-USDT", "ETH-USDT"]
     }
     
@@ -46,7 +48,7 @@ class GateArbLegacy(ScriptStrategyBase):
         self.perp_maker_fee = Decimal("0.00005")
         self.perp_taker_fee = Decimal("0.00015")
         
-    def on_tick(self):
+    def on_tick(self) -> None:
         """
         Called on each tick
         """
@@ -77,7 +79,7 @@ class GateArbLegacy(ScriptStrategyBase):
         for symbol in ["BTC-USDT", "ETH-USDT"]:
             try:
                 # Get spot price
-                spot_connector = self.connectors.get("gate_io")
+                spot_connector = self.connectors.get(self.config.spot_connector_name if hasattr(self, "config") else "gate_io")
                 perp_connector = self.connectors.get("gate_io_perpetual")
                 
                 if not spot_connector or not perp_connector:
@@ -136,7 +138,7 @@ class GateArbLegacy(ScriptStrategyBase):
         # In production, would calculate actual path profitability
         return Decimal("0")  # Placeholder
         
-    def _execute_spot_perp_arbitrage(self, symbol: str, long_spot: bool):
+    def _execute_spot_perp_arbitrage(self, symbol: str, long_spot: bool) -> None:
         """
         Execute spot-perpetual arbitrage
         """
@@ -154,11 +156,11 @@ class GateArbLegacy(ScriptStrategyBase):
             # Place orders
             if long_spot:
                 # Buy spot, sell perp
-                self.buy(self.connectors["gate_io"], symbol, position_size)
+                self.buy(self.connectors[self.config.spot_connector_name if hasattr(self, "config") else "gate_io"], symbol, position_size)
                 self.sell(self.connectors["gate_io_perpetual"], symbol, position_size)
             else:
                 # Sell spot, buy perp
-                self.sell(self.connectors["gate_io"], symbol, position_size)
+                self.sell(self.connectors[self.config.spot_connector_name if hasattr(self, "config") else "gate_io"], symbol, position_size)
                 self.buy(self.connectors["gate_io_perpetual"], symbol, position_size)
                 
             # Track position
@@ -172,7 +174,7 @@ class GateArbLegacy(ScriptStrategyBase):
         except Exception as e:
             self.logger.error(f"Error executing spot-perp arbitrage: {e}")
             
-    def _execute_triangular_arbitrage(self, path: List[str]):
+    def _execute_triangular_arbitrage(self, path: List[str]) -> None:
         """
         Execute triangular arbitrage
         """
@@ -180,7 +182,7 @@ class GateArbLegacy(ScriptStrategyBase):
         # In production, would execute atomic triangular trades
         pass
         
-    def _monitor_positions(self):
+    def _monitor_positions(self) -> None:
         """
         Monitor active arbitrage positions
         """

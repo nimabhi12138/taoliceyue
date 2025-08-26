@@ -1,3 +1,5 @@
+from typing import List
+from typing import Optional
 """
 Gate.io Arbitrage Script V2
 Compatible with Hummingbot V2 Framework
@@ -48,7 +50,7 @@ class GateArbitrageV2(ScriptStrategyBase):
         self.total_pnl = Decimal("0")
         self.start_time = None
         
-    def _load_config(self):
+    def _load_config(self) -> None:
         """Load configuration from file or use defaults"""
         
         # Default configuration for spot-perp arbitrage
@@ -97,7 +99,7 @@ class GateArbitrageV2(ScriptStrategyBase):
         
         logger.info(f"Loaded {len(self.controllers)} controllers")
     
-    def on_start(self):
+    def on_start(self) -> None:
         """
         Called when the script starts
         """
@@ -117,7 +119,7 @@ class GateArbitrageV2(ScriptStrategyBase):
             self.start_controller(controller)
             logger.info(f"Started controller: {controller.config.controller_name}")
     
-    def on_stop(self):
+    def on_stop(self) -> None:
         """
         Called when the script stops
         """
@@ -133,7 +135,7 @@ class GateArbitrageV2(ScriptStrategyBase):
         # Print final statistics
         self._print_statistics()
     
-    def on_tick(self):
+    def on_tick(self) -> None:
         """
         Called on every tick
         Main strategy logic goes here
@@ -199,7 +201,7 @@ class GateArbitrageV2(ScriptStrategyBase):
         
         return Decimal("0")
     
-    def _update_performance_metrics(self):
+    def _update_performance_metrics(self) -> None:
         """Update performance metrics from controllers"""
         total_pnl = Decimal("0")
         

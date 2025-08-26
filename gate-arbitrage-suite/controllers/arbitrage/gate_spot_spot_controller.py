@@ -1,3 +1,5 @@
+from typing import List
+from typing import Optional
 """
 Gate.io Spot-Spot Cross-Market Arbitrage Controller
 Captures price inefficiencies across different spot markets
@@ -11,6 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from hummingbot.core.data_type.common import OrderType, TradeType
+from hummingbot.smart_components.models.executor_actions import ExecutorAction, CreateExecutorAction, StopExecutorAction
+
 from hummingbot.smart_components.controllers.controller_base import ControllerBase, ControllerConfigBase
 from hummingbot.smart_components.executors.arbitrage_executor import ArbitrageExecutor
 from pydantic import Field, validator
@@ -22,6 +26,7 @@ class GateSpotSpotControllerConfig(ControllerConfigBase):
     """Configuration for Spot-Spot Arbitrage Controller"""
     
     controller_name: str = "gate_spot_spot_controller"
+    controller_type: str = "directional"
     connector: str = Field(default="gate_io", description="Primary connector")
     secondary_connector: str = Field(default="gate_io", description="Secondary connector (can be same)")
     
@@ -80,7 +85,7 @@ class GateSpotSpotController(ControllerBase):
         self._total_pnl = Decimal("0")
         self._total_trades = 0
         
-    async def start(self):
+    async def start(self) -> None:
         """Initialize the controller"""
         await super().start()
         self.logger.info(f"Starting {self.config.controller_name}")
@@ -88,7 +93,7 @@ class GateSpotSpotController(ControllerBase):
         asyncio.create_task(self._monitor_opportunities())
         asyncio.create_task(self._monitor_positions())
         
-    async def stop(self):
+    async def stop(self) -> None:
         """Cleanup on stop"""
         self.logger.info(f"Stopping {self.config.controller_name}")
         for executor in self._active_executors.values():
@@ -96,7 +101,7 @@ class GateSpotSpotController(ControllerBase):
                 await executor.early_stop()
         await super().stop()
         
-    async def _load_fee_overrides(self):
+    async def _load_fee_overrides(self) -> None:
         """Load fee overrides from conf_fee_overrides.yml"""
         try:
             import yaml
@@ -113,7 +118,7 @@ class GateSpotSpotController(ControllerBase):
         except Exception as e:
             self.logger.warning(f"Could not load fee overrides: {e}")
             
-    async def _monitor_opportunities(self):
+    async def _monitor_opportunities(self) -> None:
         """Monitor for arbitrage opportunities"""
         while self.is_active:
             try:
@@ -204,7 +209,7 @@ class GateSpotSpotController(ControllerBase):
             self.logger.error(f"Error calculating position size: {e}")
             return Decimal("0")
             
-    async def _execute_opportunity(self, opportunity: SpotArbitrageOpportunity):
+    async def _execute_opportunity(self, opportunity: SpotArbitrageOpportunity) -> None:
         """Execute arbitrage opportunity"""
         try:
             if len(self._active_executors) >= self.config.max_open_positions:
@@ -248,7 +253,7 @@ class GateSpotSpotController(ControllerBase):
         except Exception as e:
             self.logger.error(f"Error executing opportunity: {e}")
             
-    async def _monitor_positions(self):
+    async def _monitor_positions(self) -> None:
         """Monitor active positions"""
         while self.is_active:
             try:
@@ -267,9 +272,29 @@ class GateSpotSpotController(ControllerBase):
         """Format controller status"""
         lines = []
         lines.append(f"\n{'=' * 50}")
-        lines.append(f"Spot-Spot Arbitrage Controller Status")
+    async def update_processed_data(self) -> None:
+        """
+        V2 Framework: Update processed data periodically
+        """
+        # Update any cached data here
+        pass
         lines.append(f"{'=' * 50}")
-        lines.append(f"Active Positions: {len(self._active_executors)}/{self.config.max_open_positions}")
+    async def determine_executor_actions(self) -> List[ExecutorAction]:
+        """
+        V2 Framework: Determine what executors to create/stop
+        """
+        actions = []
+        # Add logic to create executor actions
+        return actions
+        lines.append(f"Active Positions: {len(self._active_executors)}")
+    def to_format_status(self) -> List[str]:
+        """
+        V2 Framework: Format status for display
+        """
+        lines = []
+        lines.append(f"Controller: {self.config.controller_name}")
+        lines.append(f"Status: {'Active' if self.is_active else 'Inactive'}")
+        return lines
         lines.append(f"Total PnL: ${self._total_pnl:.2f}")
         lines.append(f"Total Trades: {self._total_trades}")
         

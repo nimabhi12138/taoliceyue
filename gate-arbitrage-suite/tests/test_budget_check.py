@@ -9,14 +9,14 @@ from decimal import Decimal
 class TestBudgetCheck(unittest.TestCase):
     """Test budget allocation and risk management"""
     
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test parameters"""
         self.total_balance = Decimal("10000")  # $10,000 USDT
         self.max_exposure_pct = Decimal("0.5")  # 50% max exposure
         self.max_position_usd = Decimal("5000")  # $5,000 max per position
         self.min_order_size = Decimal("10")  # $10 minimum
         
-    def test_position_size_with_percentage_limit(self):
+    def test_position_size_with_percentage_limit(self) -> None:
         """Test position sizing with percentage limits"""
         # 10% position size
         position_pct = Decimal("0.1")
@@ -25,7 +25,7 @@ class TestBudgetCheck(unittest.TestCase):
         self.assertEqual(position_size, Decimal("1000"))
         self.assertLessEqual(position_size, self.max_position_usd)
         
-    def test_position_size_with_absolute_cap(self):
+    def test_position_size_with_absolute_cap(self) -> None:
         """Test position sizing with absolute cap"""
         # Try to use 60% of balance
         position_pct = Decimal("0.6")
@@ -37,7 +37,7 @@ class TestBudgetCheck(unittest.TestCase):
         self.assertEqual(position_size, Decimal("6000"))
         self.assertEqual(capped_size, Decimal("5000"))
         
-    def test_minimum_order_size_check(self):
+    def test_minimum_order_size_check(self) -> None:
         """Test minimum order size validation"""
         # Small balance scenario
         small_balance = Decimal("50")
@@ -52,7 +52,7 @@ class TestBudgetCheck(unittest.TestCase):
         can_trade = position_size >= self.min_order_size
         self.assertFalse(can_trade)
         
-    def test_multiple_position_budget_allocation(self):
+    def test_multiple_position_budget_allocation(self) -> None:
         """Test budget allocation across multiple positions"""
         num_strategies = 4
         positions_per_strategy = 3
@@ -69,7 +69,7 @@ class TestBudgetCheck(unittest.TestCase):
         total_exposure = budget_per_position * total_positions
         self.assertEqual(total_exposure, self.total_balance * self.max_exposure_pct)
         
-    def test_circuit_breaker_daily_loss_limit(self):
+    def test_circuit_breaker_daily_loss_limit(self) -> None:
         """Test circuit breaker with daily loss limit"""
         daily_loss_limit = Decimal("1000")  # $1,000 daily loss limit
         current_daily_pnl = Decimal("-950")  # Already lost $950
@@ -85,7 +85,7 @@ class TestBudgetCheck(unittest.TestCase):
         
         self.assertFalse(can_trade)  # Should stop trading
         
-    def test_drawdown_calculation(self):
+    def test_drawdown_calculation(self) -> None:
         """Test maximum drawdown calculation"""
         pnl_history = [
             Decimal("0"),
@@ -113,7 +113,7 @@ class TestBudgetCheck(unittest.TestCase):
             drawdown_pct = (max_drawdown / peak) * 100
             self.assertEqual(drawdown_pct, Decimal("80"))  # 80% drawdown
             
-    def test_leverage_constraints(self):
+    def test_leverage_constraints(self) -> None:
         """Test leverage constraints for perpetual positions"""
         max_leverage = Decimal("2")  # 2x max leverage
         collateral = Decimal("1000")
@@ -130,7 +130,7 @@ class TestBudgetCheck(unittest.TestCase):
         self.assertEqual(required_margin, Decimal("750"))
         self.assertLessEqual(required_margin, collateral)
         
-    def test_concurrent_position_limits(self):
+    def test_concurrent_position_limits(self) -> None:
         """Test concurrent position limits"""
         max_open_positions = 5
         current_positions = [
@@ -151,7 +151,7 @@ class TestBudgetCheck(unittest.TestCase):
         can_open_new = len(current_positions) < max_open_positions
         self.assertFalse(can_open_new)
         
-    def test_risk_adjusted_sizing(self):
+    def test_risk_adjusted_sizing(self) -> None:
         """Test risk-adjusted position sizing"""
         base_size = Decimal("1000")
         

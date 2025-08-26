@@ -25,7 +25,7 @@ class TestKellySizing(unittest.TestCase):
         kelly = (win_prob * b - q) / b
         return max(Decimal("0"), kelly)  # Never bet negative
         
-    def test_basic_kelly_calculation(self):
+    def test_basic_kelly_calculation(self) -> None:
         """Test basic Kelly calculation"""
         # 60% win rate, 1:1 payoff
         win_prob = Decimal("0.6")
@@ -36,7 +36,7 @@ class TestKellySizing(unittest.TestCase):
         # Kelly = (0.6 * 1 - 0.4) / 1 = 0.2
         self.assertEqual(kelly, Decimal("0.2"))
         
-    def test_conservative_kelly(self):
+    def test_conservative_kelly(self) -> None:
         """Test conservative Kelly (fractional Kelly)"""
         # Full Kelly
         win_prob = Decimal("0.65")
@@ -52,7 +52,7 @@ class TestKellySizing(unittest.TestCase):
         self.assertLess(conservative_kelly, full_kelly)
         self.assertLess(conservative_kelly, Decimal("0.1"))  # Less than 10%
         
-    def test_kelly_with_high_edge(self):
+    def test_kelly_with_high_edge(self) -> None:
         """Test Kelly with high edge scenario"""
         # 70% win rate, 2:1 payoff
         win_prob = Decimal("0.7")
@@ -63,7 +63,7 @@ class TestKellySizing(unittest.TestCase):
         # High edge should give higher Kelly fraction
         self.assertGreater(kelly, Decimal("0.5"))
         
-    def test_kelly_with_low_edge(self):
+    def test_kelly_with_low_edge(self) -> None:
         """Test Kelly with low edge scenario"""
         # 52% win rate, 1:1 payoff (typical for arbitrage)
         win_prob = Decimal("0.52")
@@ -74,7 +74,7 @@ class TestKellySizing(unittest.TestCase):
         # Low edge should give small Kelly fraction
         self.assertEqual(kelly, Decimal("0.04"))  # 4%
         
-    def test_kelly_cap_for_arbitrage(self):
+    def test_kelly_cap_for_arbitrage(self) -> None:
         """Test Kelly capping for arbitrage strategies"""
         # Arbitrage parameters
         win_prob = Decimal("0.65")  # Conservative estimate
@@ -95,7 +95,7 @@ class TestKellySizing(unittest.TestCase):
         # Should be capped
         self.assertLessEqual(final_size, max_position)
         
-    def test_kelly_with_multiple_positions(self):
+    def test_kelly_with_multiple_positions(self) -> None:
         """Test Kelly adjustment for multiple concurrent positions"""
         # Single position Kelly
         single_kelly = Decimal("0.1")

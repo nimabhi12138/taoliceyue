@@ -1,3 +1,4 @@
+from typing import Optional
 """
 Rate Limiter for Gate.io API
 Manages API request rates to avoid hitting limits
@@ -188,7 +189,7 @@ class RateLimiter:
             while order_queue and order_queue[0] < cutoff:
                 order_queue.popleft()
                 
-    def _update_rps(self, current_time: float):
+    def _update_rps(self, current_time: float) -> None:
         """Update current requests per second metric"""
         recent_count = sum(
             1 for t in self._request_times 
@@ -196,7 +197,7 @@ class RateLimiter:
         )
         self._current_rps = recent_count
         
-    async def _wait_for_tokens(self, needed: int):
+    async def _wait_for_tokens(self, needed: int) -> None:
         """Wait for tokens to become available"""
         wait_time = needed / self.config.requests_per_second
         logger.info(f"Waiting {wait_time:.2f}s for tokens")

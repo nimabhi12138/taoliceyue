@@ -1,3 +1,5 @@
+from typing import List
+from typing import Optional
 """
 Gate.io Spot-Perpetual Basis Arbitrage Controller V2
 Fully compatible with Hummingbot V2 Framework (2024)
@@ -127,7 +129,7 @@ class GateSpotPerpController(ControllerBase):
         """V2 Framework: Check if controller is actively trading"""
         return not self._circuit_breaker_triggered and len(self._active_executors) < self.config.max_open_positions
     
-    async def update_processed_data(self):
+    async def update_processed_data(self) -> None:
         """
         V2 Framework: Update processed data
         Called periodically by the framework
@@ -397,7 +399,7 @@ class GateSpotPerpController(ControllerBase):
                 total += Decimal(str(executor_info.filled_amount_quote))
         return total
     
-    async def _check_circuit_breakers(self):
+    async def _check_circuit_breakers(self) -> None:
         """Check and update circuit breaker status"""
         # Reset if daily PnL is back to acceptable level
         if self._circuit_breaker_triggered:

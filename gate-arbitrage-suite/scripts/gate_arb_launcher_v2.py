@@ -1,3 +1,4 @@
+from typing import List
 """
 Gate.io Arbitrage Launcher Script v2
 Loads and runs multiple controllers using Hummingbot 2.x architecture
@@ -41,7 +42,7 @@ class GateArbLauncherV2(ScriptStrategyBase):
         self._status_report_interval = 30
         self._last_status_report = 0
         
-    def on_start(self):
+    def on_start(self) -> None:
         """
         Called when the script starts
         """
@@ -67,7 +68,7 @@ class GateArbLauncherV2(ScriptStrategyBase):
         for controller in self.controllers:
             asyncio.create_task(controller.start())
             
-    def on_stop(self):
+    def on_stop(self) -> None:
         """
         Called when the script stops
         """
@@ -77,7 +78,7 @@ class GateArbLauncherV2(ScriptStrategyBase):
         for controller in self.controllers:
             asyncio.create_task(controller.stop())
             
-    def _load_controller(self, config_path: str):
+    def _load_controller(self, config_path: str) -> None:
         """
         Load a controller from configuration file
         """
@@ -112,7 +113,7 @@ class GateArbLauncherV2(ScriptStrategyBase):
             self.logger.error(f"Error loading controller from {config_path}: {e}")
             raise
             
-    def on_tick(self):
+    def on_tick(self) -> None:
         """
         Called on each tick (every second by default)
         """
