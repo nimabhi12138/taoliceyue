@@ -8,10 +8,9 @@ def test_apply_filters_and_min_notional():
         price_tick_size=Decimal("0.01"),
     )
     amt, px = apply_filters(Decimal("0.12345"), Decimal("80.1234"), filters)
-    # truncated
-    assert amt == Decimal("0.123")
+    # truncated price; amount rejected due to min notional
     assert px == Decimal("80.12")
-    assert (amt * px) >= Decimal("10") or amt == 0  # min notional enforced
+    assert amt == 0  # 0.123 * 80.12 = 9.855 < 10 -> reject to 0
 
 def test_below_min_notional_returns_zero():
     filters = ExchangeFilters(
