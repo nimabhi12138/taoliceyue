@@ -14,7 +14,11 @@ from itertools import permutations
 
 from hummingbot.core.data_type.common import OrderType, TradeType
 from hummingbot.connector.connector_base import ConnectorBase
-from hummingbot.strategy.strategy_v2_base import StrategyV2Base
+
+try:
+    from hummingbot.strategy.strategy_v2_base import StrategyV2Base
+except ImportError:
+    from hummingbot.strategy.strategy_base import StrategyBase as StrategyV2Base
 
 from .fee_model import FeeModel
 from .risk_manager import RiskManager

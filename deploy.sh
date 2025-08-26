@@ -113,8 +113,12 @@ log "Deployed controllers"
 # Copy configuration templates
 mkdir -p "$HUMMINGBOT_PATH/conf/examples"
 mkdir -p "$HUMMINGBOT_PATH/conf/controllers"
+mkdir -p "$HUMMINGBOT_PATH/conf/scripts"
 cp -r conf/examples/* "$HUMMINGBOT_PATH/conf/examples/"
 cp -r conf/controllers/* "$HUMMINGBOT_PATH/conf/controllers/"
+if [ -d "conf/scripts" ]; then
+    cp -r conf/scripts/* "$HUMMINGBOT_PATH/conf/scripts/"
+fi
 log "Deployed configuration templates"
 
 # Install Python dependencies
@@ -180,7 +184,18 @@ log "Creating helper scripts..."
 cat > "$HUMMINGBOT_PATH/start_gate_arb.sh" << 'EOF'
 #!/bin/bash
 cd "$(dirname "$0")"
-python bin/hummingbot_quickstart.py start --script gate_arb_launcher_v2.py --conf conf/examples/conf_v2_with_controllers.yml
+echo "Starting Gate.io Arbitrage Suite..."
+echo "Available scripts:"
+echo "1. gate_arb_example.py (Simple example)"
+echo "2. gate_arb_launcher_v2.py (Advanced controller launcher)"
+echo "3. gate_arb_legacy.py (Legacy strategy)"
+echo ""
+echo "Choose your startup method:"
+echo "Basic: python bin/hummingbot_quickstart.py start --script gate_arb_example.py --conf conf/scripts/gate_arb_example.yml"
+echo "Advanced: python bin/hummingbot_quickstart.py start --script gate_arb_launcher_v2.py --conf conf/examples/conf_v2_with_controllers.yml"
+echo ""
+echo "Starting basic example by default..."
+python bin/hummingbot_quickstart.py start --script gate_arb_example.py --conf conf/scripts/gate_arb_example.yml
 EOF
 
 # Status script

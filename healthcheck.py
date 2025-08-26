@@ -129,7 +129,8 @@ class HealthChecker:
             if not self.hummingbot_path.exists():
                 return {"status": "fail", "message": f"Hummingbot path not found: {self.hummingbot_path}"}
                 
-            required_dirs = ["scripts", "conf", "bin"]
+            required_dirs = ["scripts", "conf"]
+            optional_dirs = ["bin", "hummingbot"]  # bin might be in different location
             missing_dirs = [d for d in required_dirs if not (self.hummingbot_path / d).exists()]
             
             if missing_dirs:

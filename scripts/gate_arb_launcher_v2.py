@@ -15,7 +15,6 @@ from typing import Dict, List, Optional
 from hummingbot.core.data_type.common import TradeType
 from hummingbot.strategy.script_strategy_base import ScriptStrategyBase
 from hummingbot.connector.connector_base import ConnectorBase
-from hummingbot.core.utils.async_utils import safe_ensure_future
 
 # Add the current directory to Python path for controller imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -43,6 +42,10 @@ class GateArbLauncherV2(ScriptStrategyBase):
         super().__init__(connectors)
         self.controllers = []
         self.active_strategies = {}
+        
+        # Initialize connectors properly
+        self.connectors = connectors
+        
         self.setup_logging()
         self.load_controllers()
         

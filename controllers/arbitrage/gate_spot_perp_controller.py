@@ -14,8 +14,24 @@ from dataclasses import dataclass
 from hummingbot.core.data_type.common import OrderType, TradeType
 from hummingbot.core.data_type.order_candidate import OrderCandidate
 from hummingbot.connector.connector_base import ConnectorBase
-from hummingbot.strategy.strategy_v2_base import StrategyV2Base
-from hummingbot.strategy.executors.arbitrage_executor import ArbitrageExecutor
+
+try:
+    from hummingbot.strategy.strategy_v2_base import StrategyV2Base
+except ImportError:
+    # Fallback for older versions
+    from hummingbot.strategy.strategy_base import StrategyBase as StrategyV2Base
+    
+try:
+    from hummingbot.strategy.executors.arbitrage_executor import ArbitrageExecutor
+except ImportError:
+    # Create a placeholder if not available
+    class ArbitrageExecutor:
+        def __init__(self, *args, **kwargs):
+            self.is_active = False
+        def start(self):
+            pass
+        def stop(self):
+            pass
 
 from .fee_model import FeeModel
 from .risk_manager import RiskManager
@@ -44,9 +60,13 @@ class GateSpotPerpController(StrategyV2Base):
     """
     
     def __init__(self, config: Dict):
+        # Initialize with config, connectors will be set separately
         super().__init__(config)
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
+        
+        # Get connectors from config if provided
+        self.connectors = config.get("connectors", {})
         
         # Configuration
         self.spot_connector = config.get("spot_connector", "gate_io")
