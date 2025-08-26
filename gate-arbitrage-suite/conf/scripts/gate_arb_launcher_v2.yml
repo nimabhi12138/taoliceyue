@@ -1,0 +1,28 @@
+# Gate.io Arbitrage Suite Launcher Configuration
+# This configuration loads multiple arbitrage controllers
+
+# List of controller configuration files to load
+# Paths are relative to conf/controllers/
+controllers:
+  - arbitrage/gate_spot_perp_controller.yml
+  - arbitrage/gate_triangular_controller.yml
+  # - arbitrage/gate_spot_spot_controller.yml
+  # - arbitrage/gate_stat_arb_controller.yml
+
+# Global settings
+status_report_interval: 30  # Report status every 30 seconds
+
+# Connectors to use (configured separately in Hummingbot)
+connectors:
+  - gate_io
+  - gate_io_perpetual
+
+# Risk limits (global)
+max_total_exposure_usd: 50000  # Maximum total exposure across all strategies
+daily_loss_limit_usd: 1000     # Stop all trading if daily loss exceeds this
+
+# Monitoring
+enable_telegram_alerts: false  # Set to true and configure telegram bot
+alert_on_error: true
+alert_on_large_pnl: true
+large_pnl_threshold_usd: 100
