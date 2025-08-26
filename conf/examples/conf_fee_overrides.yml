@@ -1,0 +1,49 @@
+# Gate.io Fee Overrides Configuration
+# Apply 75% trading fee rebate for VIP users
+# 
+# IMPORTANT: Replace the values below with your actual post-rebate fees
+# Formula: effective_fee = raw_fee * (1 - rebate_ratio)
+# With 75% rebate: effective_fee = raw_fee * 0.25
+#
+# Example: If raw maker fee is 0.2% (0.002), with 75% rebate: 0.002 * 0.25 = 0.0005 (0.05%)
+
+fee_overrides:
+  # Gate.io Spot Trading Fees (after 75% rebate)
+  gate_io:
+    # Standard rates before rebate: maker 0.2%, taker 0.2%
+    # With 75% rebate: maker 0.05%, taker 0.05%
+    maker: 0.0005  # 0.05% - REPLACE with your actual post-rebate maker fee
+    taker: 0.0005  # 0.05% - REPLACE with your actual post-rebate taker fee
+    
+  # Gate.io Perpetual Trading Fees (after 75% rebate)  
+  gate_io_perpetual:
+    # Standard rates before rebate: maker 0.02%, taker 0.06%
+    # With 75% rebate: maker 0.005%, taker 0.015%
+    maker: 0.00005  # 0.005% - REPLACE with your actual post-rebate maker fee
+    taker: 0.00015  # 0.015% - REPLACE with your actual post-rebate taker fee
+
+# Additional configuration options
+rebate_settings:
+  # Default rebate ratio (used if not specified per exchange)
+  default_rebate_ratio: 0.75  # 75%
+  
+  # Exchange-specific rebate ratios (if different from default)
+  exchange_rebates:
+    gate_io: 0.75
+    gate_io_perpetual: 0.75
+    
+# Notes:
+# 1. These fees are critical for accurate profitability calculations
+# 2. Set these values to your actual effective fees after rebates
+# 3. Contact Gate.io support to confirm your exact VIP fee structure
+# 4. Update these values when your VIP level changes
+# 5. The arbitrage strategies will use these values for all profit calculations
+
+# VIP Level Reference (update based on your actual rates):
+# VIP0: Standard rates (no rebate)
+# VIP1: Usually 10-20% rebate
+# VIP2: Usually 25-40% rebate  
+# VIP3: Usually 50-65% rebate
+# VIP4+: Usually 70-75%+ rebate
+# 
+# Always verify with Gate.io as rates may change and vary by account type

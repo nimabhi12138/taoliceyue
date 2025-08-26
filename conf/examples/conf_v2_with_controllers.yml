@@ -1,0 +1,148 @@
+# Gate.io Arbitrage Suite Configuration
+# Example configuration for multiple arbitrage controllers
+
+# Script configuration
+script_config:
+  script_file_name: gate_arb_launcher_v2.py
+  
+# Markets configuration
+markets:
+  gate_io:
+    - BTC-USDT
+    - ETH-USDT
+    - BNB-USDT
+  gate_io_perpetual:
+    - BTC-USDT
+    - ETH-USDT
+
+# Controller configurations
+controllers:
+  # Spot-Perp Arbitrage Controller
+  - controller_name: arbitrage.gate_spot_perp_controller
+    controller_type: GateSpotPerpController
+    controller_config:
+      spot_connector: gate_io
+      perp_connector: gate_io_perpetual
+      trading_pairs:
+        - BTC-USDT
+        - ETH-USDT
+      min_profitability_bps: 5  # 0.05% minimum profit
+      max_position_size: 1.0    # 1.0 BTC/ETH maximum
+      funding_threshold_bps: 2  # 0.02% funding consideration
+      max_funding_periods: 24   # Max 24 hours hold time
+      rebalance_threshold_bps: 20  # 0.2% basis change to close
+      slippage_buffer_bps: 2    # 0.02% slippage buffer
+      fee_override_path: conf/examples/conf_fee_overrides.yml
+      risk_config:
+        max_position_size: 1.0
+        max_total_exposure: 10.0
+        max_symbol_exposure: 2.0
+        max_session_loss: 0.1   # 10%
+        max_drawdown: 0.05      # 5%
+        kelly_multiplier: 0.25  # 25% of Kelly
+        
+  # Triangular Arbitrage Controller
+  - controller_name: arbitrage.gate_triangular_controller
+    controller_type: GateTriangularController
+    controller_config:
+      connector: gate_io
+      base_currencies:
+        - USDT
+        - BTC
+        - ETH
+      quote_currencies:
+        - USDT
+        - BTC
+        - ETH
+        - BNB
+      min_profitability_bps: 8  # 0.08% minimum for triangular
+      max_position_size: 1.0
+      slippage_buffer_bps: 3    # Higher buffer for triangular
+      execution_timeout: 10     # 10 second timeout
+      prefer_maker_orders: true
+      atomic_execution: true
+      rollback_on_partial: true
+      fee_override_path: conf/examples/conf_fee_overrides.yml
+      risk_config:
+        max_position_size: 0.5  # More conservative for triangular
+        max_total_exposure: 5.0
+        max_symbol_exposure: 1.0
+        max_session_loss: 0.05  # 5%
+        max_drawdown: 0.03      # 3%
+        kelly_multiplier: 0.2   # 20% of Kelly
+
+# Global risk management
+global_config:
+  # Emergency stop conditions
+  emergency_stop:
+    max_daily_loss: 0.2        # 20% daily loss limit
+    max_error_rate: 0.15       # 15% error rate limit
+    min_account_balance: 100   # Minimum USDT balance
+    
+  # Execution settings
+  execution:
+    max_concurrent_orders: 10
+    order_timeout: 30          # 30 second order timeout
+    max_slippage_bps: 10       # 0.1% max slippage
+    retry_count: 3
+    
+  # Logging and monitoring
+  logging:
+    level: INFO
+    structured_logs: true
+    export_csv: true
+    csv_path: logs/arbitrage_trades.csv
+    
+  # Performance tracking
+  metrics:
+    track_latency: true
+    export_prometheus: false
+    prometheus_port: 8000
+
+# Connectors required
+required_connectors:
+  - gate_io
+  - gate_io_perpetual
+
+# Exchange API configuration
+exchange_config:
+  gate_io:
+    testnet_url: https://api.testnet.gate.io
+    mainnet_url: https://api.gate.io
+    rate_limits:
+      orders_per_second: 10
+      requests_per_second: 100
+    websocket:
+      enable_order_book_stream: true
+      enable_trade_stream: true
+      
+  gate_io_perpetual:
+    testnet_url: https://fx-api-testnet.gate.io
+    mainnet_url: https://fx-api.gate.io
+    rate_limits:
+      orders_per_second: 20
+      requests_per_second: 100
+    websocket:
+      enable_order_book_stream: true
+      enable_trade_stream: true
+      enable_funding_stream: true
+
+# Strategy-specific configurations
+strategy_overrides:
+  # Override any strategy settings here
+  spot_perp_overrides:
+    # More aggressive settings for experienced users
+    min_profitability_bps: 3
+    max_position_size: 2.0
+    
+  triangular_overrides:
+    # Conservative settings
+    min_profitability_bps: 12
+    execution_timeout: 5
+
+# Notes:
+# 1. Adjust min_profitability_bps based on market conditions
+# 2. Start with smaller position sizes until comfortable
+# 3. Monitor risk metrics closely in the first days
+# 4. Update fee_override_path with your actual rebated rates
+# 5. Consider running in paper trading mode first
