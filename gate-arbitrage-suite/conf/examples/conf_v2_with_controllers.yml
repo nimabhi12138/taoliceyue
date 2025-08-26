@@ -1,0 +1,147 @@
+# Gate.io Arbitrage Suite V2 Configuration
+# This configuration loads multiple arbitrage controllers for Hummingbot V2
+
+# Controller configurations to load
+# These files should be placed in conf/controllers/
+controllers:
+  - id: spot_perp_arb_1
+    config_file: arbitrage/gate_spot_perp_controller.yml
+    enabled: true
+    
+  - id: triangular_arb_1
+    config_file: arbitrage/gate_triangular_controller.yml
+    enabled: true
+    
+  - id: spot_spot_arb_1
+    config_file: arbitrage/gate_spot_spot_controller.yml
+    enabled: false  # Disabled by default
+    
+  - id: stat_arb_1
+    config_file: arbitrage/gate_stat_arb_controller.yml
+    enabled: false  # Disabled by default
+
+# Global settings
+global_config:
+  # Update interval in seconds
+  update_interval: 1.0
+  
+  # Status report interval in seconds
+  status_report_interval: 30
+  
+  # Enable debug logging
+  debug_mode: false
+
+# Risk management (global limits)
+risk_management:
+  # Maximum total exposure across all strategies (USDT)
+  max_total_exposure_usd: 50000
+  
+  # Daily loss limit (USDT)
+  daily_loss_limit_usd: 1000
+  
+  # Session loss limit (USDT)
+  session_loss_limit_usd: 500
+  
+  # Maximum concurrent positions across all strategies
+  max_concurrent_positions: 10
+  
+  # Enable circuit breaker
+  circuit_breaker_enabled: true
+  
+  # Circuit breaker cooldown (seconds)
+  circuit_breaker_cooldown: 300
+
+# Connectors to use
+connectors:
+  - name: gate_io
+    required: true
+    
+  - name: gate_io_perpetual
+    required: true
+
+# Trading pairs
+trading_pairs:
+  spot:
+    - BTC-USDT
+    - ETH-USDT
+    - BNB-USDT
+    - SOL-USDT
+    - MATIC-USDT
+    
+  perpetual:
+    - BTC-USDT
+    - ETH-USDT
+    - BNB-USDT
+    - SOL-USDT
+
+# Monitoring and alerts
+monitoring:
+  # Enable metrics export
+  enable_metrics: true
+  
+  # Metrics export port
+  metrics_port: 9090
+  
+  # Enable telegram alerts
+  enable_telegram: false
+  telegram_bot_token: ""
+  telegram_chat_id: ""
+  
+  # Enable email alerts
+  enable_email: false
+  smtp_server: ""
+  smtp_port: 587
+  smtp_username: ""
+  smtp_password: ""
+  alert_email: ""
+  
+  # Alert thresholds
+  alerts:
+    large_pnl_threshold_usd: 100
+    high_slippage_bps: 20
+    low_balance_usd: 100
+    error_rate_threshold: 0.1
+
+# Performance optimization
+performance:
+  # Use async execution
+  async_execution: true
+  
+  # Number of worker threads
+  worker_threads: 4
+  
+  # Order placement timeout (seconds)
+  order_timeout: 30
+  
+  # API request timeout (seconds)
+  api_timeout: 10
+  
+  # Enable order caching
+  enable_order_cache: true
+  
+  # Cache TTL (seconds)
+  cache_ttl: 5
+
+# Backtesting configuration (optional)
+backtesting:
+  enabled: false
+  start_date: "2024-01-01"
+  end_date: "2024-01-31"
+  initial_balance_usd: 10000
+  
+# Logging configuration
+logging:
+  # Log level (DEBUG, INFO, WARNING, ERROR)
+  log_level: INFO
+  
+  # Log file path
+  log_file: logs/arbitrage.log
+  
+  # Max log file size (MB)
+  max_file_size_mb: 100
+  
+  # Number of backup files
+  backup_count: 10
+  
+  # Enable JSON logging
+  json_logging: true
