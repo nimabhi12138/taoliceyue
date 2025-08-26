@@ -10,6 +10,11 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+# Ensure repository root is importable for 'controllers' package
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 # Minimal shim to run without HB if needed.
 # In production, prefer Hummingbot's official v2_with_controllers.py loader.
 # This wrapper attempts to import it; if missing, uses a lightweight dispatcher.
