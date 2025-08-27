@@ -1,0 +1,32 @@
+# Gate.io Arbitrage Example Script Configuration
+# For use with gate_arb_example.py
+
+# Script configuration
+script_config:
+  script_file_name: gate_arb_example.py
+  
+# Markets that will be used by the script
+markets:
+  gate_io:
+    - BTC-USDT
+    - ETH-USDT
+  gate_io_perpetual:
+    - BTC-USDT
+    - ETH-USDT
+
+# Strategy parameters
+strategy_config:
+  min_profitability: 0.0008  # 0.08% minimum profit
+  max_position_size: 0.1
+  check_interval: 5.0  # seconds
+
+# Candles configuration (optional)
+candles_config:
+  - connector: gate_io
+    trading_pair: BTC-USDT
+    interval: 1m
+    max_records: 100
+  - connector: gate_io
+    trading_pair: ETH-USDT  
+    interval: 1m
+    max_records: 100

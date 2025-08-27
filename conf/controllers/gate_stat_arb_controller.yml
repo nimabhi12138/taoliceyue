@@ -1,0 +1,134 @@
+controller_name: arbitrage.gate_stat_arb_controller  
+controller_type: GateStatArbController
+
+# Gate.io Statistical Arbitrage Controller Configuration
+# Mean-reversion and co-integration pairs trading
+
+# Market Configuration
+markets:
+  connector: gate_io
+  trading_pairs:
+    # BTC-ETH pair
+    BTC-USDT_ETH-USDT:
+      hedge_ratio: 1.0             # Initial hedge ratio (will be calculated)
+      correlation: 0.0             # Initial correlation (will be calculated)
+      half_life: 1800.0           # Initial half-life estimate (30 minutes)
+    
+    # ETH-BNB pair  
+    ETH-USDT_BNB-USDT:
+      hedge_ratio: 1.0
+      correlation: 0.0
+      half_life: 1800.0
+      
+    # BTC-SOL pair
+    BTC-USDT_SOL-USDT:
+      hedge_ratio: 1.0
+      correlation: 0.0
+      half_life: 1800.0
+
+# Statistical Analysis Settings
+statistical_analysis:
+  lookback_period: 200            # Number of price observations for analysis
+  min_correlation: 0.7           # Minimum correlation to trade pair
+  min_half_life: 300             # Minimum mean reversion half-life (5 min)
+  max_half_life: 7200            # Maximum mean reversion half-life (2 hours)
+  rebalance_frequency: 3600      # Rebalance statistics every hour
+
+# Signal Generation
+signal_generation:
+  z_score_entry: 2.0             # Z-score threshold for entry
+  z_score_exit: 0.5              # Z-score threshold for exit
+  z_score_stop: 3.5              # Z-score threshold for stop loss
+  signal_confidence_threshold: 0.6  # Minimum confidence for signal
+  enable_mean_reversion_filter: true  # Filter signals by mean reversion
+
+# Position Management
+position_management:
+  max_position_size: 1.0         # Maximum position size per pair
+  max_concurrent_pairs: 3        # Maximum concurrent pair positions
+  enable_position_scaling: true  # Scale positions by signal strength
+  position_hold_time_max: 14400  # Maximum hold time (4 hours)
+
+# Risk Management
+risk_config:
+  max_position_size: 1.0         # Hard cap on position size
+  max_symbol_exposure: 2.0       # Maximum exposure per symbol
+  max_total_exposure: 4.0        # Maximum total exposure
+  max_session_loss: 0.06         # Maximum session loss (6%)
+  max_drawdown: 0.03             # Maximum drawdown (3%)
+  kelly_multiplier: 0.2          # Kelly criterion multiplier (conservative)
+  min_win_rate: 0.5             # Minimum required win rate
+  min_trade_count: 20           # Minimum trades before assessment
+
+# Execution Settings
+execution:
+  prefer_maker_orders: true      # Prefer post-only orders
+  order_timeout_seconds: 60     # Longer timeout for stat arb
+  max_retries: 2                # Maximum retry attempts
+  retry_delay_seconds: 2        # Delay between retries
+  partial_fill_threshold: 0.85  # Accept partial fills above this ratio
+  enable_atomic_pairs: false    # Execute both legs atomically (complex)
+
+# Circuit Breakers
+circuit_breakers:
+  enable_session_loss_breaker: true
+  enable_drawdown_breaker: true
+  enable_correlation_breaker: true
+  enable_half_life_breaker: true
+  min_correlation_threshold: 0.5   # Stop trading if correlation drops
+  max_half_life_threshold: 10800   # Stop if half-life exceeds 3 hours
+  cooldown_minutes: 20             # Cooldown period after circuit breaker
+
+# Fee Configuration
+fee_override_path: conf/examples/conf_fee_overrides.yml
+
+# Cointegration Analysis
+cointegration:
+  enable_cointegration_test: true    # Perform cointegration tests
+  cointegration_confidence: 0.95     # Confidence level for tests
+  test_frequency: 7200               # Test every 2 hours
+  min_cointegration_score: 0.8       # Minimum score to trade
+
+# Volatility Analysis
+volatility:
+  enable_volatility_adjustment: true  # Adjust for volatility
+  volatility_lookback: 100           # Volatility calculation window
+  volatility_threshold: 0.05         # Maximum volatility threshold
+  enable_regime_detection: false     # Detect volatility regimes
+
+# Momentum Filters
+momentum_filters:
+  enable_momentum_filter: false      # Filter by momentum
+  momentum_lookback: 50              # Momentum calculation window
+  momentum_threshold: 0.02           # Momentum threshold
+
+# Monitoring & Logging
+monitoring:
+  log_level: INFO
+  enable_performance_metrics: true
+  enable_statistical_tracking: true
+  enable_pair_analysis: true
+  status_update_interval: 15        # Status update interval in seconds
+
+# Advanced Settings  
+advanced:
+  enable_regime_switching: false     # Detect market regime changes
+  regime_detection_window: 500       # Window for regime detection
+  enable_adaptive_parameters: true   # Adapt parameters over time
+  parameter_adaptation_window: 1000  # Window for parameter adaptation
+  enable_outlier_detection: true     # Detect and handle outliers
+  outlier_threshold: 3.0             # Outlier threshold (std devs)
+
+# Backtesting & Simulation
+backtesting:
+  enable_paper_trading: true         # Enable paper trading mode
+  simulation_capital: 10000          # Simulation capital
+  enable_performance_attribution: true  # Track performance attribution
+  track_transaction_costs: true      # Include transaction costs
+
+# Optimization Settings
+optimization:
+  enable_parameter_optimization: false  # Auto-optimize parameters
+  optimization_frequency: 86400         # Optimize daily
+  optimization_lookback: 5000           # Data for optimization
+  optimization_method: "grid_search"    # "grid_search" or "genetic"
