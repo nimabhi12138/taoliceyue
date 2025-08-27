@@ -1,0 +1,59 @@
+# Gate.io Fee Overrides Configuration
+# This file defines the actual trading fees after rebates
+# IMPORTANT: Update these values with your actual VIP level and rebate percentages
+
+# Gate.io Spot Trading Fees (with 75% rebate)
+# Original fees: Maker 0.1%, Taker 0.2%
+# With 75% rebate: Maker 0.025%, Taker 0.05%
+gate_io:
+  # Default fees for all pairs (as decimal, not percentage)
+  default:
+    maker_fee: 0.00025  # 0.025% = 0.1% * (1 - 0.75 rebate)
+    taker_fee: 0.0005   # 0.05% = 0.2% * (1 - 0.75 rebate)
+  
+  # Per-symbol overrides (if different from default)
+  BTC-USDT:
+    maker_fee: 0.00025
+    taker_fee: 0.0005
+  
+  ETH-USDT:
+    maker_fee: 0.00025
+    taker_fee: 0.0005
+  
+  # Add more symbol-specific fees as needed
+
+# Gate.io Perpetual/Futures Trading Fees (with 75% rebate)
+# Original fees: Maker 0.02%, Taker 0.06%
+# With 75% rebate: Maker 0.005%, Taker 0.015%
+gate_io_perpetual:
+  # Default fees for all perpetual contracts
+  default:
+    maker_fee: 0.00005  # 0.005% = 0.02% * (1 - 0.75 rebate)
+    taker_fee: 0.00015  # 0.015% = 0.06% * (1 - 0.75 rebate)
+  
+  # Per-contract overrides
+  BTC-USDT:
+    maker_fee: 0.00005
+    taker_fee: 0.00015
+  
+  ETH-USDT:
+    maker_fee: 0.00005
+    taker_fee: 0.00015
+
+# VIP Level Reference (Gate.io)
+# VIP 0: Maker 0.1%, Taker 0.2% (Spot) | Maker 0.02%, Taker 0.06% (Perps)
+# VIP 1: Maker 0.09%, Taker 0.19% (Spot) | Maker 0.015%, Taker 0.05% (Perps)
+# ...
+# VIP 16: Maker -0.005%, Taker 0.025% (Spot) | Maker -0.01%, Taker 0.02% (Perps)
+
+# Rebate Programs:
+# - Trading Fee Rebate: Up to 75% rebate on trading fees
+# - Referral Rebate: Additional rebates through referral programs
+# - GT Holder Benefits: Extra discounts for GT token holders
+
+# IMPORTANT NOTES:
+# 1. These are NET fees after rebates - what you actually pay
+# 2. Update these values based on your actual VIP level and rebate percentage
+# 3. Negative fees (maker rebates at high VIP levels) should be entered as negative values
+# 4. All fees are in decimal format (0.001 = 0.1%)
+# 5. The arbitrage strategies will use these values for profitability calculations

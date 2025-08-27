@@ -1,0 +1,46 @@
+# Gate.io Triangular Arbitrage Controller Configuration
+controller_name: gate_triangular_controller
+connector: gate_io
+
+# Base currencies for path finding
+base_currencies:
+  - USDT
+  - BTC
+  - ETH
+
+# Trading symbols to include in arbitrage paths
+symbols:
+  - BTC-USDT
+  - ETH-USDT
+  - ETH-BTC
+  - BNB-USDT
+  - BNB-BTC
+  - BNB-ETH
+  - SOL-USDT
+  - SOL-BTC
+  - SOL-ETH
+  - MATIC-USDT
+  - MATIC-BTC
+  - MATIC-ETH
+
+# Arbitrage parameters
+min_profit_bps: 20         # Minimum profit after all fees (20 bps)
+slippage_buffer_bps: 5     # Slippage buffer per leg (5 bps)
+
+# Position sizing
+position_size_pct: 0.05    # 5% of balance per arbitrage
+max_position_usd: 5000     # Maximum $5,000 per triangular trade
+
+# Execution settings
+use_maker_orders: false    # Use taker for speed (triangular needs fast execution)
+max_execution_time: 10     # 10 seconds max for all 3 legs
+atomic_execution: true     # Cancel all if one leg fails
+
+# Risk management
+max_concurrent_arbs: 2     # Max 2 concurrent triangular trades
+cooldown_seconds: 5        # Wait 5 seconds between trades
+max_daily_trades: 100      # Maximum 100 trades per day
+
+# Fee configuration (will be overridden by conf_fee_overrides.yml)
+maker_fee_bps: 2.5         # 0.025% with 75% rebate
+taker_fee_bps: 5.0         # 0.05% with 75% rebate

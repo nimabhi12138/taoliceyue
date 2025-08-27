@@ -1,0 +1,44 @@
+# Prometheus Configuration for Gate.io Arbitrage Suite
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'gate-arbitrage'
+    environment: 'production'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Arbitrage Suite Metrics
+  - job_name: 'arbitrage-suite'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: '/metrics'
+    
+  # FastAPI Backend
+  - job_name: 'backend-api'
+    static_configs:
+      - targets: ['localhost:8000']
+    metrics_path: '/metrics'
+    
+  # Node Exporter for system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+      
+  # Gate.io API health
+  - job_name: 'gate-api-health'
+    metrics_path: '/health'
+    static_configs:
+      - targets: ['api.gate.io:443']
+    scheme: https
