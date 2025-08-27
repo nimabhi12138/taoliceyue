@@ -1,0 +1,18 @@
+rebate_ratio: 0.75  # 75% rebate by default
+
+connectors:
+  gate_io:
+    spot:
+      # Either set these post-rebate (preferred)...
+      maker_bps_post_rebate: 0.025   # example: raw 0.1% * 0.25 = 0.025%
+      taker_bps_post_rebate: 0.05
+      # ...or set raw values and omit post_rebate fields:
+      # maker_bps: 10.0    # raw bps (0.10%)
+      # taker_bps: 20.0    # raw bps (0.20%)
+
+  gate_io_perpetual:
+    perpetual:
+      maker_bps_post_rebate: 0.005
+      taker_bps_post_rebate: 0.04
+      # maker_bps: 2.0
+      # taker_bps: 16.0

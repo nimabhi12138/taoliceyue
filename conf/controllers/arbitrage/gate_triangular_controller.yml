@@ -1,0 +1,29 @@
+# Gate Triangular Arb Controller
+type: arbitrage_triangular
+global_fee_overrides_path: conf/examples/conf_fee_overrides.yml
+
+symbols:
+  connector: gate_io
+  a_b_pair: ETH-BTC
+  b_c_pair: BTC-USDT
+  c_a_pair: USDT-ETH
+
+thresholds:
+  entry_bps: 8
+  slippage_buffer_bps: 3
+  safety_margin_bps: 2
+
+risk:
+  per_trade_notional_cap: 1500
+  portfolio_notional: 15000
+
+filters:
+  lot_step_size: 0.0001
+  min_notional: 10
+  price_tick_size: 0.0001
+
+cooldown_seconds: 2
+
+debug_a_to_b: 0.06
+debug_b_to_c: 68000
+debug_c_to_a: 0.0002857

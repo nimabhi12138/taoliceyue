@@ -1,0 +1,31 @@
+# Gate Spot–Spot Arb Controller
+type: arbitrage_spot_spot
+global_fee_overrides_path: conf/examples/conf_fee_overrides.yml
+
+symbols:
+  buy_connector: gate_io
+  buy_pair: ETH-USDT
+  sell_connector: gate_io
+  sell_pair: ETH-USDT
+
+thresholds:
+  entry_bps: 6
+  slippage_buffer_bps: 2
+  safety_margin_bps: 1
+
+risk:
+  per_trade_notional_cap: 2000
+  portfolio_notional: 20000
+
+filters:
+  buy_lot_step_size: 0.001
+  buy_min_notional: 10
+  buy_price_tick_size: 0.01
+  sell_lot_step_size: 0.001
+  sell_min_notional: 10
+  sell_price_tick_size: 0.01
+
+cooldown_seconds: 3
+
+debug_buy_best_ask: 3500.0
+debug_sell_best_bid: 3510.0
