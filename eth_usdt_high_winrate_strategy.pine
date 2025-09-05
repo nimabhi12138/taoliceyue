@@ -96,7 +96,7 @@ money_flow_bearish = money_flow < 50 and money_flow < money_flow[1]
 // ==================== 交易信号生成 ====================
 
 // 时间过滤
-time_ok = not enable_time_filter or (hour >= start_hour and hour <= end_hour)
+time_ok = not enable_time_filter or (hour >= start_hour and hour <= end_hour) or (start_hour > end_hour and (hour >= start_hour or hour <= end_hour))
 
 // 多头信号条件
 long_ema_cross = ta.crossover(ema_fast, ema_slow)
@@ -120,18 +120,25 @@ short_trend_ok = trend_down_5m
 short_volume_ok = volume_spike
 short_momentum_ok = price_momentum < 1.0
 
-// 综合信号
-long_signal = time_ok and long_ema_cross and long_rsi_ok and long_macd_ok and 
-              long_stoch_ok and long_vwap_ok and long_bb_ok and long_trend_ok and 
-              long_volume_ok and long_momentum_ok and money_flow_bullish
+// 综合信号 (核心条件 + 过滤条件)
+long_core = time_ok and long_ema_cross and long_rsi_ok and long_trend_ok
+long_filters = long_macd_ok and long_stoch_ok and long_vwap_ok and long_bb_ok and long_volume_ok and long_momentum_ok
+long_signal = long_core and long_filters and money_flow_bullish
 
-short_signal = time_ok and short_ema_cross and short_rsi_ok and short_macd_ok and 
-               short_stoch_ok and short_vwap_ok and short_bb_ok and short_trend_ok and 
-               short_volume_ok and short_momentum_ok and money_flow_bearish
+short_core = time_ok and short_ema_cross and short_rsi_ok and short_trend_ok
+short_filters = short_macd_ok and short_stoch_ok and short_vwap_ok and short_bb_ok and short_volume_ok and short_momentum_ok
+short_signal = short_core and short_filters and money_flow_bearish
 
 // 机构跟随增强信号
 long_institutional = long_signal and (big_order_up or money_flow > 60)
+
+// 备用简化信号 (当主要信号过于严格时)
+long_simple = long_core and (long_macd_ok or long_stoch_ok) and long_volume_ok and money_flow_bullish
+long_final = long_institutional or (long_simple and not long_institutional[1])
+
 short_institutional = short_signal and (big_order_down or money_flow < 40)
+short_simple = short_core and (short_macd_ok or short_stoch_ok) and short_volume_ok and money_flow_bearish
+short_final = short_institutional or (short_simple and not short_institutional[1])
 
 // ==================== 风险管理 ====================
 
@@ -144,19 +151,20 @@ short_take_profit = close - atr * take_profit_ratio
 // 仓位大小计算 (基于风险百分比)
 account_balance = strategy.equity
 risk_amount = account_balance * risk_per_trade / 100
-position_size = math.min(risk_amount / (atr * stop_loss_ratio), account_balance * 0.95 / close)
+atr_risk = atr * stop_loss_ratio
+position_size = atr_risk > 0 ? math.min(risk_amount / atr_risk, account_balance * 0.95 / close) : 0
 
 // ==================== 交易执行 ====================
 
 // 多头交易
-if long_institutional and strategy.position_size == 0 and position_size > 0
+if long_final and strategy.position_size == 0 and position_size > 0 and close > 0
     strategy.entry("Long", strategy.long, qty=position_size)
     strategy.exit("Long Exit", "Long", 
                   limit=long_take_profit, 
                   stop=long_stop_loss)
 
 // 空头交易
-if short_institutional and strategy.position_size == 0 and position_size > 0
+if short_final and strategy.position_size == 0 and position_size > 0 and close > 0
     strategy.entry("Short", strategy.short, qty=position_size)
     strategy.exit("Short Exit", "Short", 
                   limit=short_take_profit, 
@@ -183,10 +191,16 @@ fill(p1, p2, color=color.new(color.gray, 95), title="布林带填充")
 plot(vwap, color=color.purple, title="VWAP", linewidth=1)
 
 // 绘制交易信号
-plotshape(long_institutional, title="多头信号", location=location.belowbar, 
+plotshape(long_final, title="多头信号", location=location.belowbar, 
           color=color.green, style=shape.labelup, text="LONG", size=size.small)
-plotshape(short_institutional, title="空头信号", location=location.abovebar, 
+plotshape(short_final, title="空头信号", location=location.abovebar, 
           color=color.red, style=shape.labeldown, text="SHORT", size=size.small)
+
+// 绘制机构信号
+plotshape(long_institutional, title="机构多头", location=location.belowbar, 
+          color=color.lime, style=shape.triangleup, size=size.tiny)
+plotshape(short_institutional, title="机构空头", location=location.abovebar, 
+          color=color.fuchsia, style=shape.triangledown, size=size.tiny)
 
 // 绘制大单信号
 plotshape(big_order_up, title="大单买入", location=location.belowbar, 
@@ -235,18 +249,40 @@ if barstate.islast
 // 计算胜率
 total_trades = strategy.closedtrades
 winning_trades = 0
+total_profit = 0.0
+max_drawdown = 0.0
+current_drawdown = 0.0
+peak_equity = strategy.initial_capital
+
 for i = 0 to total_trades - 1
-    if strategy.closedtrades.profit(i) > 0
+    trade_profit = strategy.closedtrades.profit(i)
+    total_profit += trade_profit
+    if trade_profit > 0
         winning_trades += 1
 
-win_rate = total_trades > 0 ? winning_trades / total_trades * 100 : 0
+// 计算最大回撤
+current_equity = strategy.equity
+if current_equity > peak_equity
+    peak_equity := current_equity
+    current_drawdown := 0
+else
+    current_drawdown := (peak_equity - current_equity) / peak_equity * 100
+    if current_drawdown > max_drawdown
+        max_drawdown := current_drawdown
 
-// 在图表上显示胜率
+win_rate = total_trades > 0 ? winning_trades / total_trades * 100 : 0
+avg_profit = total_trades > 0 ? total_profit / total_trades : 0
+
+// 在图表上显示详细统计
 if barstate.islast
     label.new(bar_index, high, 
+              "📊 策略统计\n" +
               "胜率: " + str.tostring(math.round(win_rate, 2)) + "%\n" +
               "总交易: " + str.tostring(total_trades) + "\n" +
-              "盈利交易: " + str.tostring(winning_trades),
+              "盈利交易: " + str.tostring(winning_trades) + "\n" +
+              "总收益: " + str.tostring(math.round(total_profit, 2)) + "$\n" +
+              "平均收益: " + str.tostring(math.round(avg_profit, 2)) + "$\n" +
+              "最大回撤: " + str.tostring(math.round(max_drawdown, 2)) + "%",
               style=label.style_label_down, 
               color=win_rate >= 70 ? color.green : color.red,
               textcolor=color.white,
