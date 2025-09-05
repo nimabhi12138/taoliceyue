@@ -1,0 +1,300 @@
+//@version=6
+strategy("ETH/USDT超短线剥头皮策略", 
+         shorttitle="ETH剥头皮", 
+         overlay=true, 
+         initial_capital=50, 
+         default_qty_type=strategy.cash, 
+         default_qty_value=50,
+         commission_type=strategy.commission.percent, 
+         commission_value=0.025,  // 考虑75%返佣后的实际手续费
+         slippage=1,
+         pyramiding=0,
+         close_entries_rule="ANY")
+
+// ==================== 剥头皮专用参数 ====================
+var g1 = "=== 剥头皮设置 ==="
+leverage = input.int(100, "杠杆倍数", minval=50, maxval=125, group=g1)
+scalp_tp_pips = input.float(0.15, "止盈点数(%)", minval=0.05, maxval=0.5, step=0.01, group=g1)
+scalp_sl_pips = input.float(0.08, "止损点数(%)", minval=0.03, maxval=0.2, step=0.01, group=g1)
+max_trades_per_hour = input.int(10, "每小时最大交易次数", minval=5, maxval=20, group=g1)
+
+// 快速指标参数
+var g2 = "=== 快速指标 ==="
+ema_ultra_fast = input.int(3, "超快EMA", minval=2, maxval=8, group=g2)
+ema_fast = input.int(8, "快速EMA", minval=5, maxval=13, group=g2)
+ema_medium = input.int(21, "中速EMA", minval=13, maxval=34, group=g2)
+rsi_fast = input.int(7, "快速RSI", minval=3, maxval=14, group=g2)
+stoch_k = input.int(5, "随机指标K", minval=3, maxval=14, group=g2)
+stoch_d = input.int(3, "随机指标D", minval=2, maxval=8, group=g2)
+
+// 成交量和波动率
+var g3 = "=== 成交量波动 ==="
+vol_length = input.int(10, "成交量周期", minval=5, maxval=20, group=g3)
+vol_mult = input.float(1.3, "成交量倍数", minval=1.1, maxval=2.0, step=0.1, group=g3)
+atr_fast = input.int(7, "快速ATR", minval=3, maxval=14, group=g3)
+
+// 时间过滤
+var g4 = "=== 时间过滤 ==="
+trade_session = input.session("0000-2359", "交易时段", group=g4)
+avoid_news_time = input.bool(true, "避开重要新闻时段", group=g4)
+
+// ==================== 快速指标计算 ====================
+
+// 超快速均线系统
+ema_ultra = ta.ema(close, ema_ultra_fast)
+ema_f = ta.ema(close, ema_fast)
+ema_m = ta.ema(close, ema_medium)
+
+// 价格动量
+price_momentum = (close - close[3]) / close[3] * 100
+momentum_bullish = price_momentum > 0.05
+momentum_bearish = price_momentum < -0.05
+
+// 快速RSI
+rsi_f = ta.rsi(close, rsi_fast)
+rsi_oversold_scalp = 25
+rsi_overbought_scalp = 75
+
+// 随机指标
+k = ta.stoch(close, high, low, stoch_k)
+d = ta.sma(k, stoch_d)
+stoch_bullish = k > d and k < 80
+stoch_bearish = k < d and k > 20
+
+// 快速ATR
+atr_f = ta.atr(atr_fast)
+volatility_filter = atr_f > ta.sma(atr_f, 14) * 0.8
+
+// 成交量分析
+vol_avg = ta.sma(volume, vol_length)
+vol_surge = volume > vol_avg * vol_mult
+vol_declining = volume < vol_avg * 0.8
+
+// 价格行为分析
+body_size = math.abs(close - open)
+wick_top = high - math.max(close, open)
+wick_bottom = math.min(close, open) - low
+total_range = high - low
+
+// 强势K线识别
+strong_bull_candle = close > open and body_size > total_range * 0.6 and wick_top < body_size * 0.3
+strong_bear_candle = close < open and body_size > total_range * 0.6 and wick_bottom < body_size * 0.3
+
+// 锤子线和上吊线
+hammer = body_size < total_range * 0.3 and wick_bottom > body_size * 2 and wick_top < body_size * 0.5
+hanging_man = body_size < total_range * 0.3 and wick_top > body_size * 2 and wick_bottom < body_size * 0.5
+
+// 微观趋势识别
+micro_uptrend = ema_ultra > ema_f and ema_f > ema_m and close > ema_ultra
+micro_downtrend = ema_ultra < ema_f and ema_f < ema_m and close < ema_ultra
+
+// 支撑阻力突破
+resistance_break = high > ta.highest(high[1], 5) and close > open
+support_break = low < ta.lowest(low[1], 5) and close < open
+
+// ==================== 机构行为识别 ====================
+
+// 大单检测 (基于价格和成交量关系)
+price_impact = (high - low) / low * 100
+volume_price_ratio = volume / price_impact
+large_order_buy = volume_price_ratio > ta.sma(volume_price_ratio, 20) * 1.5 and close > open
+large_order_sell = volume_price_ratio > ta.sma(volume_price_ratio, 20) * 1.5 and close < open
+
+// 订单流不平衡
+buying_pressure = (close - low) / (high - low)
+selling_pressure = (high - close) / (high - low)
+order_flow_bullish = buying_pressure > 0.7 and vol_surge
+order_flow_bearish = selling_pressure > 0.7 and vol_surge
+
+// 隐含波动率变化
+iv_proxy = atr_f / close * 100
+iv_increasing = iv_proxy > ta.sma(iv_proxy, 10) * 1.1
+iv_decreasing = iv_proxy < ta.sma(iv_proxy, 10) * 0.9
+
+// ==================== 剥头皮信号生成 ====================
+
+// 多头剥头皮条件
+scalp_long_setup = micro_uptrend and stoch_bullish and rsi_f > 30 and rsi_f < 70
+scalp_long_trigger = (ta.crossover(ema_ultra, ema_f) or strong_bull_candle or resistance_break) and vol_surge
+scalp_long_confirmation = order_flow_bullish or large_order_buy or momentum_bullish
+
+// 空头剥头皮条件  
+scalp_short_setup = micro_downtrend and stoch_bearish and rsi_f > 30 and rsi_f < 70
+scalp_short_trigger = (ta.crossunder(ema_ultra, ema_f) or strong_bear_candle or support_break) and vol_surge
+scalp_short_confirmation = order_flow_bearish or large_order_sell or momentum_bearish
+
+// 最终信号
+long_signal = scalp_long_setup and scalp_long_trigger and scalp_long_confirmation and volatility_filter
+short_signal = scalp_short_setup and scalp_short_trigger and scalp_short_confirmation and volatility_filter
+
+// ==================== 时间和频率过滤 ====================
+
+// 交易时段过滤
+in_session = not na(time(timeframe.period, trade_session))
+
+// 交易频率控制
+var int trades_this_hour = 0
+var int last_trade_hour = 0
+
+current_hour = hour(time)
+if current_hour != last_trade_hour
+    trades_this_hour := 0
+    last_trade_hour := current_hour
+
+can_trade = trades_this_hour < max_trades_per_hour and in_session
+
+// 避开新闻时段 (简化版，实际应该根据经济日历)
+news_hour = avoid_news_time and (hour(time) == 8 or hour(time) == 14 or hour(time) == 21)  // UTC时间
+safe_to_trade = not news_hour
+
+// ==================== 风险管理 ====================
+
+// 动态仓位计算
+account_risk = 50 * 0.02  // 2%风险
+tick_value = close * scalp_sl_pips / 100
+position_size_calc = account_risk / tick_value * leverage
+
+// 最大仓位限制
+max_position = 50 * leverage * 0.8  // 最大80%仓位
+final_position_size = math.min(position_size_calc, max_position)
+
+// 止盈止损价格
+long_tp_price = close * (1 + scalp_tp_pips / 100)
+long_sl_price = close * (1 - scalp_sl_pips / 100)
+short_tp_price = close * (1 - scalp_tp_pips / 100)  
+short_sl_price = close * (1 + scalp_sl_pips / 100)
+
+// ==================== 交易执行 ====================
+
+// 多头交易
+if long_signal and strategy.position_size == 0 and can_trade and safe_to_trade
+    strategy.entry("ScalpLong", strategy.long, qty=final_position_size)
+    strategy.exit("LongExit", "ScalpLong", limit=long_tp_price, stop=long_sl_price)
+    trades_this_hour := trades_this_hour + 1
+
+// 空头交易  
+if short_signal and strategy.position_size == 0 and can_trade and safe_to_trade
+    strategy.entry("ScalpShort", strategy.short, qty=final_position_size)
+    strategy.exit("ShortExit", "ScalpShort", limit=short_tp_price, stop=short_sl_price)
+    trades_this_hour := trades_this_hour + 1
+
+// 快速平仓条件 (反向信号或时间止损)
+quick_exit_long = strategy.position_size > 0 and (short_signal or ta.crossunder(ema_ultra, ema_f))
+quick_exit_short = strategy.position_size < 0 and (long_signal or ta.crossover(ema_ultra, ema_f))
+
+if quick_exit_long
+    strategy.close("ScalpLong", comment="Quick Exit Long")
+if quick_exit_short  
+    strategy.close("ScalpShort", comment="Quick Exit Short")
+
+// 时间止损 (持仓超过10分钟强制平仓)
+var float entry_time = na
+if strategy.position_size != 0 and na(entry_time)
+    entry_time := time
+if strategy.position_size == 0
+    entry_time := na
+
+time_stop = not na(entry_time) and (time - entry_time) > 600000  // 10分钟
+
+if time_stop
+    strategy.close_all(comment="Time Stop")
+
+// ==================== 图表显示 ====================
+
+// 绘制关键均线
+plot(ema_ultra, "超快EMA", color=color.yellow, linewidth=1)
+plot(ema_f, "快速EMA", color=color.blue, linewidth=1)
+plot(ema_m, "中速EMA", color=color.red, linewidth=2)
+
+// 绘制交易信号
+plotshape(long_signal and can_trade, "剥头皮买入", location.belowbar, color=color.lime, style=shape.triangleup, size=size.small)
+plotshape(short_signal and can_trade, "剥头皮卖出", location.abovebar, color=color.red, style=shape.triangledown, size=size.small)
+
+// 背景颜色显示趋势
+bgcolor(micro_uptrend ? color.new(color.green, 95) : micro_downtrend ? color.new(color.red, 95) : na)
+
+// 成交量放大提示
+bgcolor(vol_surge ? color.new(color.blue, 90) : na, title="成交量放大")
+
+// ==================== 实时信息面板 ====================
+
+if barstate.islast
+    var table scalp_table = table.new(position.top_left, 3, 8, bgcolor=color.white, border_width=1)
+    
+    table.cell(scalp_table, 0, 0, "剥头皮监控", text_color=color.white, bgcolor=color.navy)
+    table.cell(scalp_table, 1, 0, "状态", text_color=color.white, bgcolor=color.navy)
+    table.cell(scalp_table, 2, 0, "数值", text_color=color.white, bgcolor=color.navy)
+    
+    table.cell(scalp_table, 0, 1, "微观趋势", text_color=color.black)
+    table.cell(scalp_table, 1, 1, micro_uptrend ? "上涨" : micro_downtrend ? "下跌" : "震荡", 
+               text_color=micro_uptrend ? color.green : micro_downtrend ? color.red : color.orange)
+    table.cell(scalp_table, 2, 1, str.tostring(math.round(price_momentum, 3)) + "%", text_color=color.black)
+    
+    table.cell(scalp_table, 0, 2, "快速RSI", text_color=color.black)
+    table.cell(scalp_table, 1, 2, rsi_f > 50 ? "多头" : "空头", text_color=rsi_f > 50 ? color.green : color.red)
+    table.cell(scalp_table, 2, 2, str.tostring(math.round(rsi_f)), text_color=color.black)
+    
+    table.cell(scalp_table, 0, 3, "随机指标", text_color=color.black)
+    table.cell(scalp_table, 1, 3, stoch_bullish ? "看涨" : stoch_bearish ? "看跌" : "中性", 
+               text_color=stoch_bullish ? color.green : stoch_bearish ? color.red : color.orange)
+    table.cell(scalp_table, 2, 3, str.tostring(math.round(k)) + "/" + str.tostring(math.round(d)), text_color=color.black)
+    
+    table.cell(scalp_table, 0, 4, "成交量", text_color=color.black)
+    table.cell(scalp_table, 1, 4, vol_surge ? "放大" : vol_declining ? "萎缩" : "正常", 
+               text_color=vol_surge ? color.green : vol_declining ? color.red : color.orange)
+    table.cell(scalp_table, 2, 4, str.tostring(math.round(volume/vol_avg, 2)) + "x", text_color=color.black)
+    
+    table.cell(scalp_table, 0, 5, "订单流", text_color=color.black)
+    table.cell(scalp_table, 1, 5, order_flow_bullish ? "买盘" : order_flow_bearish ? "卖盘" : "平衡", 
+               text_color=order_flow_bullish ? color.green : order_flow_bearish ? color.red : color.orange)
+    table.cell(scalp_table, 2, 5, str.tostring(math.round(buying_pressure, 2)), text_color=color.black)
+    
+    table.cell(scalp_table, 0, 6, "交易频率", text_color=color.black)
+    table.cell(scalp_table, 1, 6, can_trade ? "允许" : "限制", text_color=can_trade ? color.green : color.red)
+    table.cell(scalp_table, 2, 6, str.tostring(trades_this_hour) + "/" + str.tostring(max_trades_per_hour), text_color=color.black)
+    
+    table.cell(scalp_table, 0, 7, "交易信号", text_color=color.black)
+    table.cell(scalp_table, 1, 7, long_signal ? "买入" : short_signal ? "卖出" : "等待", 
+               text_color=long_signal ? color.green : short_signal ? color.red : color.orange)
+    table.cell(scalp_table, 2, 7, safe_to_trade ? "安全" : "新闻", text_color=safe_to_trade ? color.green : color.red)
+
+// ==================== 性能统计 ====================
+
+if barstate.islast and strategy.closedtrades > 10
+    win_rate = strategy.wintrades / strategy.closedtrades * 100
+    avg_trade_duration = strategy.closedtrades > 0 ? (strategy.closedtrades * 10) : 0  // 估算平均持仓时间
+    profit_per_trade = strategy.netprofit / strategy.closedtrades
+    
+    var table perf_table = table.new(position.bottom_left, 2, 6, bgcolor=color.white, border_width=1)
+    
+    table.cell(perf_table, 0, 0, "剥头皮统计", text_color=color.white, bgcolor=color.navy)
+    table.cell(perf_table, 1, 0, "数值", text_color=color.white, bgcolor=color.navy)
+    
+    table.cell(perf_table, 0, 1, "胜率", text_color=color.black)
+    table.cell(perf_table, 1, 1, str.tostring(math.round(win_rate, 1)) + "%", 
+               text_color=win_rate >= 70 ? color.green : win_rate >= 60 ? color.orange : color.red)
+    
+    table.cell(perf_table, 0, 2, "总交易", text_color=color.black)
+    table.cell(perf_table, 1, 2, str.tostring(strategy.closedtrades), text_color=color.black)
+    
+    table.cell(perf_table, 0, 3, "净利润", text_color=color.black)
+    table.cell(perf_table, 1, 3, "$" + str.tostring(math.round(strategy.netprofit, 2)), 
+               text_color=strategy.netprofit > 0 ? color.green : color.red)
+    
+    table.cell(perf_table, 0, 4, "平均每笔", text_color=color.black)
+    table.cell(perf_table, 1, 4, "$" + str.tostring(math.round(profit_per_trade, 2)), 
+               text_color=profit_per_trade > 0 ? color.green : color.red)
+    
+    table.cell(perf_table, 0, 5, "最大回撤", text_color=color.black)
+    table.cell(perf_table, 1, 5, str.tostring(math.round(strategy.max_drawdown, 2)) + "%", 
+               text_color=strategy.max_drawdown < 10 ? color.green : color.red)
+
+// ==================== 风险提醒 ====================
+
+// 高风险警告
+high_risk_warning = volatility_filter and iv_increasing and vol_surge
+plotchar(high_risk_warning, "高风险警告", "⚠", location.top, color=color.red, size=size.large)
+
+// 市场异常检测
+market_anomaly = atr_f > ta.sma(atr_f, 20) * 2 or volume > vol_avg * 3
+plotchar(market_anomaly, "市场异常", "!", location.top, color=color.orange, size=size.normal)

@@ -1,0 +1,312 @@
+//@version=6
+strategy("ETH/USDT高胜率机构跟随策略", 
+         shorttitle="ETH机构跟随", 
+         overlay=true, 
+         initial_capital=50, 
+         default_qty_type=strategy.percent_of_equity, 
+         default_qty_value=100,
+         commission_type=strategy.commission.percent, 
+         commission_value=0.025,  // 0.025% 考虑75%返佣后的实际手续费
+         slippage=2)
+
+// ==================== 参数设置 ====================
+// 基础参数
+var g1 = "=== 基础设置 ==="
+leverage = input.int(100, "杠杆倍数", minval=1, maxval=125, group=g1)
+riskPercent = input.float(2.0, "单笔风险百分比", minval=0.1, maxval=5.0, step=0.1, group=g1)
+
+// 均线系统参数
+var g2 = "=== 均线系统 ==="
+ema_fast = input.int(8, "快速EMA周期", minval=3, maxval=21, group=g2)
+ema_slow = input.int(21, "慢速EMA周期", minval=8, maxval=55, group=g2)
+sma_trend = input.int(50, "趋势SMA周期", minval=21, maxval=200, group=g2)
+
+// 动量指标参数
+var g3 = "=== 动量指标 ==="
+rsi_length = input.int(14, "RSI周期", minval=5, maxval=30, group=g3)
+rsi_oversold = input.int(30, "RSI超卖线", minval=20, maxval=40, group=g3)
+rsi_overbought = input.int(70, "RSI超买线", minval=60, maxval=80, group=g3)
+macd_fast = input.int(12, "MACD快线", minval=8, maxval=21, group=g3)
+macd_slow = input.int(26, "MACD慢线", minval=21, maxval=34, group=g3)
+macd_signal = input.int(9, "MACD信号线", minval=5, maxval=13, group=g3)
+
+// 波动率指标参数
+var g4 = "=== 波动率指标 ==="
+bb_length = input.int(20, "布林带周期", minval=10, maxval=50, group=g4)
+bb_mult = input.float(2.0, "布林带标准差", minval=1.0, maxval=3.0, step=0.1, group=g4)
+atr_length = input.int(14, "ATR周期", minval=7, maxval=21, group=g4)
+
+// 成交量分析参数
+var g5 = "=== 成交量分析 ==="
+vol_ma_length = input.int(20, "成交量均线周期", minval=10, maxval=50, group=g5)
+vol_spike_mult = input.float(1.5, "成交量放大倍数", minval=1.2, maxval=3.0, step=0.1, group=g5)
+
+// 机构跟随参数
+var g6 = "=== 机构跟随 ==="
+vwap_length = input.int(20, "VWAP周期", minval=10, maxval=50, group=g6)
+smart_money_length = input.int(14, "聪明钱指标周期", minval=7, maxval=21, group=g6)
+
+// 风险管理参数
+var g7 = "=== 风险管理 ==="
+tp_mult = input.float(2.5, "止盈倍数", minval=1.5, maxval=5.0, step=0.1, group=g7)
+sl_mult = input.float(1.0, "止损倍数", minval=0.5, maxval=2.0, step=0.1, group=g7)
+trailing_stop = input.bool(true, "启用追踪止损", group=g7)
+
+// ==================== 指标计算 ====================
+
+// 均线系统
+ema_fast_line = ta.ema(close, ema_fast)
+ema_slow_line = ta.ema(close, ema_slow)
+sma_trend_line = ta.sma(close, sma_trend)
+
+// 趋势方向
+trend_up = close > sma_trend_line and ema_fast_line > ema_slow_line
+trend_down = close < sma_trend_line and ema_fast_line < ema_slow_line
+
+// RSI指标
+rsi = ta.rsi(close, rsi_length)
+rsi_bullish = rsi > rsi_oversold and rsi < rsi_overbought
+rsi_momentum_up = rsi > rsi[1] and rsi[1] > rsi[2]
+rsi_momentum_down = rsi < rsi[1] and rsi[1] < rsi[2]
+
+// MACD指标
+[macd_line, signal_line, hist] = ta.macd(close, macd_fast, macd_slow, macd_signal)
+macd_bullish = macd_line > signal_line and hist > hist[1]
+macd_bearish = macd_line < signal_line and hist < hist[1]
+
+// 布林带
+[bb_upper, bb_middle, bb_lower] = ta.bb(close, bb_length, bb_mult)
+bb_squeeze = (bb_upper - bb_lower) / bb_middle < 0.1
+bb_expansion = (bb_upper - bb_lower) / bb_middle > 0.15
+
+// ATR波动率
+atr = ta.atr(atr_length)
+volatility_high = atr > ta.sma(atr, 20) * 1.2
+
+// 成交量分析
+vol_ma = ta.sma(volume, vol_ma_length)
+vol_spike = volume > vol_ma * vol_spike_mult
+vol_above_avg = volume > vol_ma
+
+// VWAP机构跟随
+vwap = ta.vwap(hlc3)
+price_above_vwap = close > vwap
+price_below_vwap = close < vwap
+
+// 聪明钱指标 (基于价格和成交量的关系)
+smart_money_index = ta.sma((close - low) - (high - close), smart_money_length)
+smart_money_bullish = smart_money_index > 0 and smart_money_index > smart_money_index[1]
+smart_money_bearish = smart_money_index < 0 and smart_money_index < smart_money_index[1]
+
+// 订单流分析 (基于K线形态和成交量)
+buying_pressure = (close - low) / (high - low) * volume
+selling_pressure = (high - close) / (high - low) * volume
+net_pressure = ta.sma(buying_pressure - selling_pressure, 5)
+institutional_buying = net_pressure > 0 and net_pressure > net_pressure[1]
+institutional_selling = net_pressure < 0 and net_pressure < net_pressure[1]
+
+// 市场结构分析
+higher_high = high > ta.highest(high[1], 5)
+higher_low = low > ta.lowest(low[1], 5)
+lower_high = high < ta.highest(high[1], 5)
+lower_low = low < ta.lowest(low[1], 5)
+
+bullish_structure = higher_high and higher_low
+bearish_structure = lower_high and lower_low
+
+// ==================== 信号生成 ====================
+
+// 多头信号条件
+long_ema_cross = ta.crossover(ema_fast_line, ema_slow_line)
+long_trend = trend_up
+long_rsi = rsi_bullish and rsi_momentum_up
+long_macd = macd_bullish
+long_bb = close > bb_middle and not bb_squeeze
+long_volume = vol_spike or vol_above_avg
+long_vwap = price_above_vwap
+long_smart_money = smart_money_bullish
+long_institution = institutional_buying
+long_structure = bullish_structure
+
+// 多头信号权重计算
+long_score = 0
+long_score := long_score + (long_ema_cross ? 3 : 0)  // EMA交叉权重最高
+long_score := long_score + (long_trend ? 2 : 0)
+long_score := long_score + (long_rsi ? 2 : 0)
+long_score := long_score + (long_macd ? 2 : 0)
+long_score := long_score + (long_bb ? 1 : 0)
+long_score := long_score + (long_volume ? 2 : 0)
+long_score := long_score + (long_vwap ? 1 : 0)
+long_score := long_score + (long_smart_money ? 2 : 0)
+long_score := long_score + (long_institution ? 2 : 0)
+long_score := long_score + (long_structure ? 1 : 0)
+
+// 空头信号条件
+short_ema_cross = ta.crossunder(ema_fast_line, ema_slow_line)
+short_trend = trend_down
+short_rsi = rsi_bullish and rsi_momentum_down
+short_macd = macd_bearish
+short_bb = close < bb_middle and not bb_squeeze
+short_volume = vol_spike or vol_above_avg
+short_vwap = price_below_vwap
+short_smart_money = smart_money_bearish
+short_institution = institutional_selling
+short_structure = bearish_structure
+
+// 空头信号权重计算
+short_score = 0
+short_score := short_score + (short_ema_cross ? 3 : 0)
+short_score := short_score + (short_trend ? 2 : 0)
+short_score := short_score + (short_rsi ? 2 : 0)
+short_score := short_score + (short_macd ? 2 : 0)
+short_score := short_score + (short_bb ? 1 : 0)
+short_score := short_score + (short_volume ? 2 : 0)
+short_score := short_score + (short_vwap ? 1 : 0)
+short_score := short_score + (short_smart_money ? 2 : 0)
+short_score := short_score + (short_institution ? 2 : 0)
+short_score := short_score + (short_structure ? 1 : 0)
+
+// 信号确认 (需要达到最低分数才能交易)
+min_score = 8  // 总分18分，需要达到8分以上
+long_signal = long_score >= min_score and not volatility_high
+short_signal = short_score >= min_score and not volatility_high
+
+// ==================== 风险管理 ====================
+
+// 计算仓位大小 (基于ATR和风险百分比)
+risk_amount = strategy.initial_capital * riskPercent / 100
+position_size = risk_amount / (atr * sl_mult) * leverage
+
+// 动态止损止盈
+long_tp = close + atr * tp_mult
+long_sl = close - atr * sl_mult
+short_tp = close - atr * tp_mult
+short_sl = close + atr * sl_mult
+
+// ==================== 交易执行 ====================
+
+// 多头交易
+if long_signal and strategy.position_size == 0
+    strategy.entry("Long", strategy.long, qty=position_size)
+    strategy.exit("Long TP/SL", "Long", limit=long_tp, stop=long_sl)
+
+// 空头交易
+if short_signal and strategy.position_size == 0
+    strategy.entry("Short", strategy.short, qty=position_size)
+    strategy.exit("Short TP/SL", "Short", limit=short_tp, stop=short_sl)
+
+// 追踪止损
+if trailing_stop and strategy.position_size > 0
+    trail_stop = close - atr * sl_mult
+    strategy.exit("Long Trail", "Long", stop=trail_stop)
+
+if trailing_stop and strategy.position_size < 0
+    trail_stop = close + atr * sl_mult
+    strategy.exit("Short Trail", "Short", stop=trail_stop)
+
+// 紧急平仓条件
+emergency_close_long = strategy.position_size > 0 and (rsi > 80 or close < ema_slow_line * 0.98)
+emergency_close_short = strategy.position_size < 0 and (rsi < 20 or close > ema_slow_line * 1.02)
+
+if emergency_close_long
+    strategy.close("Long", comment="Emergency Close Long")
+if emergency_close_short
+    strategy.close("Short", comment="Emergency Close Short")
+
+// ==================== 图表显示 ====================
+
+// 绘制均线
+plot(ema_fast_line, "快速EMA", color=color.blue, linewidth=1)
+plot(ema_slow_line, "慢速EMA", color=color.red, linewidth=1)
+plot(sma_trend_line, "趋势SMA", color=color.orange, linewidth=2)
+
+// 绘制VWAP
+plot(vwap, "VWAP", color=color.purple, linewidth=1, style=plot.style_line)
+
+// 绘制布林带
+p1 = plot(bb_upper, "BB Upper", color=color.gray)
+p2 = plot(bb_lower, "BB Lower", color=color.gray)
+fill(p1, p2, color=color.new(color.gray, 95))
+
+// 绘制交易信号
+plotshape(long_signal, "多头信号", location.belowbar, color=color.green, style=shape.labelup, text="买入", textcolor=color.white, size=size.small)
+plotshape(short_signal, "空头信号", location.abovebar, color=color.red, style=shape.labeldown, text="卖出", textcolor=color.white, size=size.small)
+
+// 绘制信号强度
+bgcolor(long_score >= min_score ? color.new(color.green, 90) : na, title="多头信号强度")
+bgcolor(short_score >= min_score ? color.new(color.red, 90) : na, title="空头信号强度")
+
+// ==================== 信息面板 ====================
+
+// 创建信息表格
+if barstate.islast
+    var table info_table = table.new(position.top_right, 4, 8, bgcolor=color.white, border_width=1)
+    
+    table.cell(info_table, 0, 0, "指标", text_color=color.black, bgcolor=color.gray)
+    table.cell(info_table, 1, 0, "多头", text_color=color.black, bgcolor=color.gray)
+    table.cell(info_table, 2, 0, "空头", text_color=color.black, bgcolor=color.gray)
+    table.cell(info_table, 3, 0, "状态", text_color=color.black, bgcolor=color.gray)
+    
+    table.cell(info_table, 0, 1, "EMA交叉", text_color=color.black)
+    table.cell(info_table, 1, 1, str.tostring(long_ema_cross), text_color=long_ema_cross ? color.green : color.black)
+    table.cell(info_table, 2, 1, str.tostring(short_ema_cross), text_color=short_ema_cross ? color.red : color.black)
+    table.cell(info_table, 3, 1, trend_up ? "上涨" : trend_down ? "下跌" : "震荡", text_color=trend_up ? color.green : trend_down ? color.red : color.orange)
+    
+    table.cell(info_table, 0, 2, "RSI", text_color=color.black)
+    table.cell(info_table, 1, 2, str.tostring(math.round(rsi)), text_color=rsi > 50 ? color.green : color.red)
+    table.cell(info_table, 2, 2, rsi_bullish ? "正常" : "极端", text_color=rsi_bullish ? color.green : color.red)
+    table.cell(info_table, 3, 2, rsi_momentum_up ? "上升" : rsi_momentum_down ? "下降" : "平稳", text_color=rsi_momentum_up ? color.green : rsi_momentum_down ? color.red : color.orange)
+    
+    table.cell(info_table, 0, 3, "MACD", text_color=color.black)
+    table.cell(info_table, 1, 3, str.tostring(macd_bullish), text_color=macd_bullish ? color.green : color.black)
+    table.cell(info_table, 2, 3, str.tostring(macd_bearish), text_color=macd_bearish ? color.red : color.black)
+    table.cell(info_table, 3, 3, hist > 0 ? "多头" : "空头", text_color=hist > 0 ? color.green : color.red)
+    
+    table.cell(info_table, 0, 4, "成交量", text_color=color.black)
+    table.cell(info_table, 1, 4, str.tostring(vol_spike), text_color=vol_spike ? color.green : color.black)
+    table.cell(info_table, 2, 4, str.tostring(vol_above_avg), text_color=vol_above_avg ? color.green : color.black)
+    table.cell(info_table, 3, 4, "倍数: " + str.tostring(math.round(volume/vol_ma, 2)), text_color=color.black)
+    
+    table.cell(info_table, 0, 5, "机构资金", text_color=color.black)
+    table.cell(info_table, 1, 5, str.tostring(institutional_buying), text_color=institutional_buying ? color.green : color.black)
+    table.cell(info_table, 2, 5, str.tostring(institutional_selling), text_color=institutional_selling ? color.red : color.black)
+    table.cell(info_table, 3, 5, smart_money_bullish ? "买入" : smart_money_bearish ? "卖出" : "中性", text_color=smart_money_bullish ? color.green : smart_money_bearish ? color.red : color.orange)
+    
+    table.cell(info_table, 0, 6, "信号强度", text_color=color.black)
+    table.cell(info_table, 1, 6, str.tostring(long_score), text_color=long_score >= min_score ? color.green : color.black)
+    table.cell(info_table, 2, 6, str.tostring(short_score), text_color=short_score >= min_score ? color.red : color.black)
+    table.cell(info_table, 3, 6, "最低: " + str.tostring(min_score), text_color=color.black)
+    
+    table.cell(info_table, 0, 7, "交易建议", text_color=color.black)
+    table.cell(info_table, 1, 7, long_signal ? "买入" : "等待", text_color=long_signal ? color.green : color.orange)
+    table.cell(info_table, 2, 7, short_signal ? "卖出" : "等待", text_color=short_signal ? color.red : color.orange)
+    table.cell(info_table, 3, 7, volatility_high ? "高波动" : "正常", text_color=volatility_high ? color.red : color.green)
+
+// ==================== 策略统计 ====================
+
+// 显示策略表现统计
+if barstate.islast and strategy.closedtrades > 0
+    win_rate = strategy.wintrades / strategy.closedtrades * 100
+    avg_win = strategy.grossprofit / strategy.wintrades
+    avg_loss = strategy.grossloss / strategy.losstrades
+    profit_factor = strategy.grossprofit / math.abs(strategy.grossloss)
+    
+    var table stats_table = table.new(position.bottom_right, 2, 6, bgcolor=color.white, border_width=1)
+    
+    table.cell(stats_table, 0, 0, "策略统计", text_color=color.black, bgcolor=color.gray)
+    table.cell(stats_table, 1, 0, "数值", text_color=color.black, bgcolor=color.gray)
+    
+    table.cell(stats_table, 0, 1, "胜率", text_color=color.black)
+    table.cell(stats_table, 1, 1, str.tostring(math.round(win_rate, 2)) + "%", text_color=win_rate >= 70 ? color.green : color.red)
+    
+    table.cell(stats_table, 0, 2, "总交易", text_color=color.black)
+    table.cell(stats_table, 1, 2, str.tostring(strategy.closedtrades), text_color=color.black)
+    
+    table.cell(stats_table, 0, 3, "盈利因子", text_color=color.black)
+    table.cell(stats_table, 1, 3, str.tostring(math.round(profit_factor, 2)), text_color=profit_factor > 1.5 ? color.green : color.red)
+    
+    table.cell(stats_table, 0, 4, "平均盈利", text_color=color.black)
+    table.cell(stats_table, 1, 4, "$" + str.tostring(math.round(avg_win, 2)), text_color=color.green)
+    
+    table.cell(stats_table, 0, 5, "平均亏损", text_color=color.black)
+    table.cell(stats_table, 1, 5, "$" + str.tostring(math.round(math.abs(avg_loss), 2)), text_color=color.red)
