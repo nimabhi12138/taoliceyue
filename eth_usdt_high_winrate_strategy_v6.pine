@@ -1,0 +1,235 @@
+//@version=6
+strategy("ETH/USDT高胜率极速策略 v6", overlay=true, initial_capital=50, 
+         commission_type=strategy.commission.percent, commission_value=0.02,
+         default_qty_type=strategy.percent_of_equity, default_qty_value=95,
+         pyramiding=0, calc_on_every_tick=true)
+
+// ===========================
+// 核心参数 - 专为高胜率优化
+// ===========================
+// 超短线参数
+ultra_fast_ma = input.int(3, "极速均线", minval=2, maxval=5)
+fast_ma = input.int(8, "快速均线", minval=5, maxval=15)
+medium_ma = input.int(21, "中速均线", minval=15, maxval=30)
+
+// 精准RSI
+rsi_length = input.int(5, "RSI周期", minval=3, maxval=10)
+rsi_ma_length = input.int(3, "RSI均线", minval=2, maxval=5)
+
+// 成交量爆发检测
+volume_spike = input.float(2.0, "成交量爆发倍数", minval=1.5, maxval=3.0)
+volume_ma_len = input.int(10, "成交量MA周期", minval=5, maxval=20)
+
+// 超级严格的风控
+atr_period = input.int(7, "ATR周期", minval=5, maxval=14)
+sl_percent = input.float(0.15, "止损百分比", minval=0.1, maxval=0.3)
+tp_percent = input.float(0.25, "止盈百分比", minval=0.2, maxval=0.5)
+max_hold_bars = input.int(10, "最大持仓K线数", minval=5, maxval=20)
+
+// ===========================
+// 计算核心指标
+// ===========================
+
+// 三重EMA系统
+ema_ultra = ta.ema(close, ultra_fast_ma)
+ema_fast = ta.ema(close, fast_ma)
+ema_medium = ta.ema(close, medium_ma)
+
+// Hull MA用于减少延迟
+hull_fast = ta.hma(close, ultra_fast_ma)
+
+// 双重RSI确认
+rsi_value = ta.rsi(close, rsi_length)
+rsi_ma = ta.ema(rsi_value, rsi_ma_length)
+rsi_accelerating = rsi_value > rsi_ma and rsi_value > rsi_value[1]
+rsi_decelerating = rsi_value < rsi_ma and rsi_value < rsi_value[1]
+
+// MACD零轴突破
+[macd, signal, hist] = ta.macd(close, 5, 13, 5)
+macd_bullish = macd > 0 and macd > signal and hist > hist[1]
+macd_bearish = macd < 0 and macd < signal and hist < hist[1]
+
+// 成交量异动
+vol_ma = ta.sma(volume, volume_ma_len)
+volume_explosion = volume > vol_ma * volume_spike
+
+// 价格动量
+momentum = close - close[3]
+momentum_ma = ta.ema(momentum, 5)
+strong_momentum_up = momentum > 0 and momentum > momentum_ma
+strong_momentum_down = momentum < 0 and momentum < momentum_ma
+
+// ATR波动率
+atr = ta.atr(atr_period)
+atr_ma = ta.sma(atr, atr_period)
+normal_volatility = atr < atr_ma * 1.5  // 过滤高波动
+
+// VWAP偏离
+vwap_val = ta.vwap(hlc3)
+above_vwap = close > vwap_val
+below_vwap = close < vwap_val
+
+// Bollinger Bands挤压
+[bb_upper, bb_basis, bb_lower] = ta.bb(close, 20, 1.5)
+bb_width = bb_upper - bb_lower
+bb_squeeze = bb_width < ta.sma(bb_width, 20) * 0.8
+
+// ===========================
+// 机构跟踪指标
+// ===========================
+
+// 简化的订单流
+buy_pressure = close > hl2 ? volume : 0
+sell_pressure = close < hl2 ? volume : 0
+order_flow = ta.ema(buy_pressure - sell_pressure, 5)
+bullish_flow = order_flow > 0 and order_flow > order_flow[1]
+bearish_flow = order_flow < 0 and order_flow < order_flow[1]
+
+// 大单检测
+big_move = math.abs(close - open) > atr * 0.5
+big_volume = volume > vol_ma * 1.8
+whale_buy = big_move and big_volume and close > open
+whale_sell = big_move and big_volume and close < open
+
+// ===========================
+// 入场条件 - 超级严格
+// ===========================
+
+// 多头条件组合
+long_trend_aligned = ema_ultra > ema_fast and ema_fast > ema_medium
+long_cross = ta.crossover(hull_fast, ema_fast) or (hull_fast > ema_fast and hull_fast[1] <= ema_fast[1])
+long_rsi_good = rsi_value > 40 and rsi_value < 70 and rsi_accelerating
+long_volume_confirm = volume_explosion or whale_buy
+long_momentum_confirm = strong_momentum_up and macd_bullish
+long_vwap_confirm = above_vwap or close > vwap_val * 0.998
+long_flow_confirm = bullish_flow
+
+// 空头条件组合
+short_trend_aligned = ema_ultra < ema_fast and ema_fast < ema_medium
+short_cross = ta.crossunder(hull_fast, ema_fast) or (hull_fast < ema_fast and hull_fast[1] >= ema_fast[1])
+short_rsi_good = rsi_value < 60 and rsi_value > 30 and rsi_decelerating
+short_volume_confirm = volume_explosion or whale_sell
+short_momentum_confirm = strong_momentum_down and macd_bearish
+short_vwap_confirm = below_vwap or close < vwap_val * 1.002
+short_flow_confirm = bearish_flow
+
+// 最终信号（所有条件必须满足）
+long_signal = long_trend_aligned and long_cross and long_rsi_good and 
+             long_volume_confirm and long_momentum_confirm and 
+             long_vwap_confirm and long_flow_confirm and 
+             normal_volatility and not bb_squeeze
+
+short_signal = short_trend_aligned and short_cross and short_rsi_good and 
+              short_volume_confirm and short_momentum_confirm and 
+              short_vwap_confirm and short_flow_confirm and 
+              normal_volatility and not bb_squeeze
+
+// ===========================
+// 出场条件
+// ===========================
+
+// 固定止损止盈
+long_sl_price = strategy.position_avg_price * (1 - sl_percent/100)
+long_tp_price = strategy.position_avg_price * (1 + tp_percent/100)
+short_sl_price = strategy.position_avg_price * (1 + sl_percent/100)
+short_tp_price = strategy.position_avg_price * (1 - tp_percent/100)
+
+// 时间止损
+bars_since_entry = strategy.position_size != 0 ? bar_index - strategy.opentrades.entry_bar_index(0) : 0
+time_exit = bars_since_entry >= max_hold_bars
+
+// 反转信号止损
+reverse_long = strategy.position_size > 0 and (short_signal or rsi_value > 75 or ta.crossunder(ema_ultra, ema_fast))
+reverse_short = strategy.position_size < 0 and (long_signal or rsi_value < 25 or ta.crossover(ema_ultra, ema_fast))
+
+// ===========================
+// 执行交易
+// ===========================
+
+// 开仓
+if long_signal and strategy.position_size == 0
+    strategy.entry("L", strategy.long)
+    
+if short_signal and strategy.position_size == 0
+    strategy.entry("S", strategy.short)
+
+// 平仓
+if strategy.position_size > 0
+    strategy.exit("LX", "L", stop=long_sl_price, limit=long_tp_price)
+    if time_exit or reverse_long
+        strategy.close("L", comment="Time/Reverse")
+        
+if strategy.position_size < 0
+    strategy.exit("SX", "S", stop=short_sl_price, limit=short_tp_price)
+    if time_exit or reverse_short
+        strategy.close("S", comment="Time/Reverse")
+
+// ===========================
+// 可视化
+// ===========================
+
+// 均线
+plot(ema_ultra, "Ultra Fast", color.new(color.aqua, 0), linewidth=2)
+plot(ema_fast, "Fast", color.new(color.blue, 0), linewidth=2)
+plot(ema_medium, "Medium", color.new(color.orange, 0), linewidth=1)
+
+// VWAP
+plot(vwap_val, "VWAP", color.new(color.purple, 0), linewidth=2)
+
+// 信号
+plotshape(long_signal, "BUY", shape.triangleup, location.belowbar, color.new(color.green, 0), size=size.small)
+plotshape(short_signal, "SELL", shape.triangledown, location.abovebar, color.new(color.red, 0), size=size.small)
+
+// 大单活动
+plotshape(whale_buy, "Whale Buy", shape.diamond, location.belowbar, color.new(color.green, 30), size=size.tiny)
+plotshape(whale_sell, "Whale Sell", shape.diamond, location.abovebar, color.new(color.red, 30), size=size.tiny)
+
+// 持仓时间警告
+bgcolor(strategy.position_size != 0 and bars_since_entry > max_hold_bars/2 ? color.new(color.yellow, 90) : na)
+
+// 止损止盈线
+if strategy.position_size > 0
+    line.new(bar_index[1], long_sl_price, bar_index, long_sl_price, color=color.red, width=1, style=line.style_dashed)
+    line.new(bar_index[1], long_tp_price, bar_index, long_tp_price, color=color.green, width=1, style=line.style_dashed)
+    
+if strategy.position_size < 0
+    line.new(bar_index[1], short_sl_price, bar_index, short_sl_price, color=color.red, width=1, style=line.style_dashed)
+    line.new(bar_index[1], short_tp_price, bar_index, short_tp_price, color=color.green, width=1, style=line.style_dashed)
+
+// ===========================
+// 实时统计
+// ===========================
+
+var table stats = table.new(position.top_right, 2, 8, bgcolor=color.new(color.black, 80))
+
+if barstate.islast
+    win_rate = strategy.wintrades / math.max(strategy.closedtrades, 1) * 100
+    profit_factor = math.abs(strategy.grossprofit / math.max(strategy.grossloss, 1))
+    
+    table.cell(stats, 0, 0, "统计项", text_color=color.white, text_size=size.small)
+    table.cell(stats, 1, 0, "数值", text_color=color.white, text_size=size.small)
+    
+    table.cell(stats, 0, 1, "胜率", text_color=color.white, text_size=size.small)
+    table.cell(stats, 1, 1, str.tostring(win_rate, "#.#") + "%", text_color=win_rate >= 70 ? color.green : color.red, text_size=size.small)
+    
+    table.cell(stats, 0, 2, "盈亏比", text_color=color.white, text_size=size.small)
+    table.cell(stats, 1, 2, str.tostring(profit_factor, "#.##"), text_color=profit_factor >= 1.5 ? color.green : color.red, text_size=size.small)
+    
+    table.cell(stats, 0, 3, "总交易", text_color=color.white, text_size=size.small)
+    table.cell(stats, 1, 3, str.tostring(strategy.closedtrades), text_color=color.white, text_size=size.small)
+    
+    table.cell(stats, 0, 4, "净利润", text_color=color.white, text_size=size.small)
+    table.cell(stats, 1, 4, str.tostring(strategy.netprofit, "#.##"), text_color=strategy.netprofit > 0 ? color.green : color.red, text_size=size.small)
+    
+    table.cell(stats, 0, 5, "RSI", text_color=color.white, text_size=size.small)
+    table.cell(stats, 1, 5, str.tostring(rsi_value, "#.#"), text_color=color.white, text_size=size.small)
+    
+    table.cell(stats, 0, 6, "持仓", text_color=color.white, text_size=size.small)
+    table.cell(stats, 1, 6, strategy.position_size > 0 ? "多" : strategy.position_size < 0 ? "空" : "无", text_color=strategy.position_size > 0 ? color.green : strategy.position_size < 0 ? color.red : color.gray, text_size=size.small)
+    
+    table.cell(stats, 0, 7, "持仓K线", text_color=color.white, text_size=size.small)
+    table.cell(stats, 1, 7, str.tostring(bars_since_entry), text_color=bars_since_entry > max_hold_bars/2 ? color.yellow : color.white, text_size=size.small)
+
+// 警报
+alertcondition(long_signal, "多头信号", "【买入】ETH/USDT 1分钟\n止损: {{plot_0}}\n止盈: {{plot_1}}")
+alertcondition(short_signal, "空头信号", "【卖出】ETH/USDT 1分钟\n止损: {{plot_2}}\n止盈: {{plot_3}}")

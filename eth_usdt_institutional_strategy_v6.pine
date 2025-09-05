@@ -1,0 +1,331 @@
+//@version=6
+strategy("ETH/USDT机构量化跟随策略 v6", overlay=true, initial_capital=50, 
+         commission_type=strategy.commission.percent, commission_value=0.02,
+         default_qty_type=strategy.percent_of_equity, default_qty_value=95,
+         pyramiding=0, calc_on_every_tick=true, max_bars_back=5000)
+
+// ===========================
+// 策略参数设置
+// ===========================
+grp1 = "基础参数"
+useFilter = input.bool(true, "启用多重过滤", group=grp1)
+leverage = input.float(100, "杠杆倍数", minval=1, maxval=125, group=grp1)
+commission_rebate = input.float(0.75, "手续费返佣率", minval=0, maxval=1, group=grp1)
+
+grp2 = "均线参数"
+fast_ma = input.int(5, "快速均线周期", minval=3, maxval=20, group=grp2)
+slow_ma = input.int(13, "慢速均线周期", minval=10, maxval=50, group=grp2)
+trend_ma = input.int(55, "趋势均线周期", minval=30, maxval=200, group=grp2)
+
+grp3 = "动量指标"
+rsi_length = input.int(7, "RSI周期", minval=5, maxval=20, group=grp3)
+rsi_ob = input.float(75, "RSI超买线", minval=70, maxval=90, group=grp3)
+rsi_os = input.float(25, "RSI超卖线", minval=10, maxval=30, group=grp3)
+macd_fast = input.int(8, "MACD快线", minval=5, maxval=20, group=grp3)
+macd_slow = input.int(21, "MACD慢线", minval=15, maxval=50, group=grp3)
+macd_signal = input.int(5, "MACD信号线", minval=3, maxval=15, group=grp3)
+
+grp4 = "成交量分析"
+volume_ma = input.int(20, "成交量均线周期", minval=10, maxval=50, group=grp4)
+volume_threshold = input.float(1.5, "成交量阈值倍数", minval=1.0, maxval=3.0, group=grp4)
+cvd_length = input.int(14, "CVD周期", minval=5, maxval=30, group=grp4)
+
+grp5 = "机构追踪"
+smart_money_length = input.int(20, "智能资金追踪周期", minval=10, maxval=50, group=grp5)
+whale_threshold = input.float(2.5, "大单阈值倍数", minval=1.5, maxval=5.0, group=grp5)
+order_flow_sensitivity = input.float(0.7, "订单流敏感度", minval=0.5, maxval=1.0, group=grp5)
+
+grp6 = "风险管理"
+atr_length = input.int(10, "ATR周期", minval=5, maxval=20, group=grp6)
+sl_atr_multi = input.float(1.2, "止损ATR倍数", minval=0.5, maxval=3.0, group=grp6)
+tp_atr_multi = input.float(2.5, "止盈ATR倍数", minval=1.0, maxval=5.0, group=grp6)
+trailing_stop = input.bool(true, "启用移动止损", group=grp6)
+trailing_offset = input.float(0.5, "移动止损偏移(%)", minval=0.1, maxval=2.0, group=grp6)
+
+// ===========================
+// 指标计算
+// ===========================
+
+// 均线系统
+ema_fast = ta.ema(close, fast_ma)
+ema_slow = ta.ema(close, slow_ma)
+ema_trend = ta.ema(close, trend_ma)
+
+// Hull MA for smoother signals
+hma_fast = ta.hma(close, fast_ma)
+hma_slow = ta.hma(close, slow_ma)
+
+// VWAP
+vwap_value = ta.vwap(hlc3)
+vwap_upper = vwap_value + ta.stdev(hlc3, 20) * 2
+vwap_lower = vwap_value - ta.stdev(hlc3, 20) * 2
+
+// RSI
+rsi = ta.rsi(close, rsi_length)
+rsi_ma = ta.ema(rsi, 5)
+
+// MACD
+[macd_line, signal_line, hist] = ta.macd(close, macd_fast, macd_slow, macd_signal)
+macd_momentum = hist > hist[1]
+
+// ATR
+atr = ta.atr(atr_length)
+atr_percent = (atr / close) * 100
+
+// 成交量分析
+volume_ma_value = ta.sma(volume, volume_ma)
+volume_ratio = volume / volume_ma_value
+high_volume = volume_ratio > volume_threshold
+
+// 计算CVD (Cumulative Volume Delta)
+delta = close > open ? volume : close < open ? -volume : 0
+cvd = ta.cum(delta)
+cvd_ma = ta.ema(cvd, cvd_length)
+cvd_signal = cvd > cvd_ma
+
+// 订单流不平衡 (Order Flow Imbalance)
+bid_volume = close > open ? volume * 0.6 : volume * 0.4
+ask_volume = volume - bid_volume
+ofi = ta.ema(bid_volume - ask_volume, 5)
+ofi_signal = ofi > ta.ema(ofi, 20) * order_flow_sensitivity
+
+// 智能资金追踪 (Smart Money Tracking)
+typical_price = hlc3
+money_flow = typical_price * volume
+smart_money = ta.ema(money_flow, smart_money_length)
+smart_money_ma = ta.ema(smart_money, smart_money_length * 2)
+smart_money_positive = smart_money > smart_money_ma
+
+// 大单检测 (Whale Detection)
+avg_trade_size = volume / math.max(1, high - low)
+whale_activity = avg_trade_size > ta.sma(avg_trade_size, 50) * whale_threshold
+
+// 市场微结构 (Market Microstructure)
+spread = high - low
+avg_spread = ta.sma(spread, 20)
+tight_spread = spread < avg_spread * 0.8
+momentum = close - close[5]
+momentum_ma = ta.ema(momentum, 10)
+
+// Bollinger Bands
+[bb_upper, bb_middle, bb_lower] = ta.bb(close, 20, 2)
+bb_squeeze = (bb_upper - bb_lower) < ta.sma(bb_upper - bb_lower, 20) * 0.8
+
+// ===========================
+// 入场条件
+// ===========================
+
+// 主要趋势判断
+trend_up = ema_fast > ema_slow and ema_slow > ema_trend
+trend_down = ema_fast < ema_slow and ema_slow < ema_trend
+
+// 多头入场条件
+long_ma_cross = ta.crossover(hma_fast, hma_slow) or (hma_fast > hma_slow and hma_fast[1] <= hma_slow[1])
+long_trend = trend_up or close > ema_trend
+long_rsi = rsi > rsi_os and rsi < rsi_ob and rsi > rsi_ma
+long_macd = macd_momentum and macd_line > signal_line
+long_volume = high_volume or volume_ratio > 1.2
+long_cvd = cvd_signal
+long_ofi = ofi_signal
+long_smart_money = smart_money_positive
+long_vwap = close > vwap_lower and close < vwap_upper * 1.02
+long_momentum = momentum > 0 and momentum > momentum_ma
+
+// 空头入场条件
+short_ma_cross = ta.crossunder(hma_fast, hma_slow) or (hma_fast < hma_slow and hma_fast[1] >= hma_slow[1])
+short_trend = trend_down or close < ema_trend
+short_rsi = rsi < rsi_ob and rsi > rsi_os and rsi < rsi_ma
+short_macd = not macd_momentum and macd_line < signal_line
+short_volume = high_volume or volume_ratio > 1.2
+short_cvd = not cvd_signal
+short_ofi = not ofi_signal
+short_smart_money = not smart_money_positive
+short_vwap = close < vwap_upper and close > vwap_lower * 0.98
+short_momentum = momentum < 0 and momentum < momentum_ma
+
+// 组合条件
+if useFilter
+    // 严格模式：需要多个条件确认
+    long_condition = long_ma_cross and long_trend and long_rsi and long_macd and 
+                    (long_volume or whale_activity) and long_cvd and long_ofi and 
+                    long_smart_money and long_vwap and tight_spread
+    
+    short_condition = short_ma_cross and short_trend and short_rsi and short_macd and 
+                     (short_volume or whale_activity) and short_cvd and short_ofi and 
+                     short_smart_money and short_vwap and tight_spread
+else
+    // 宽松模式：基础条件即可
+    long_condition = long_ma_cross and long_rsi and long_macd and long_volume
+    short_condition = short_ma_cross and short_rsi and short_macd and short_volume
+
+// 过滤震荡市场
+in_squeeze = bb_squeeze or atr_percent < 0.5
+long_condition := long_condition and not in_squeeze
+short_condition := short_condition and not in_squeeze
+
+// ===========================
+// 风险管理
+// ===========================
+
+// 计算仓位大小（考虑杠杆）
+position_size = strategy.equity * leverage / close
+
+// 动态止损止盈
+long_sl = close - atr * sl_atr_multi
+long_tp = close + atr * tp_atr_multi
+short_sl = close + atr * sl_atr_multi
+short_tp = close - atr * tp_atr_multi
+
+// ===========================
+// 交易执行
+// ===========================
+
+// 多头交易
+if long_condition and strategy.position_size == 0
+    strategy.entry("Long", strategy.long, qty=position_size)
+    
+if strategy.position_size > 0
+    if trailing_stop
+        strategy.exit("Long Exit", "Long", 
+                     trail_price=long_tp,
+                     trail_offset=close * trailing_offset / 100,
+                     stop=long_sl)
+    else
+        strategy.exit("Long Exit", "Long", 
+                     limit=long_tp,
+                     stop=long_sl)
+
+// 空头交易
+if short_condition and strategy.position_size == 0
+    strategy.entry("Short", strategy.short, qty=position_size)
+    
+if strategy.position_size < 0
+    if trailing_stop
+        strategy.exit("Short Exit", "Short", 
+                     trail_price=short_tp,
+                     trail_offset=close * trailing_offset / 100,
+                     stop=short_sl)
+    else
+        strategy.exit("Short Exit", "Short", 
+                     limit=short_tp,
+                     stop=short_sl)
+
+// 强制平仓条件
+force_close_long = strategy.position_size > 0 and (rsi > rsi_ob or ta.crossunder(ema_fast, ema_slow))
+force_close_short = strategy.position_size < 0 and (rsi < rsi_os or ta.crossover(ema_fast, ema_slow))
+
+if force_close_long
+    strategy.close("Long", comment="Force Close")
+    
+if force_close_short
+    strategy.close("Short", comment="Force Close")
+
+// ===========================
+// 图表显示
+// ===========================
+
+// 绘制均线
+plot(ema_fast, "Fast EMA", color=color.new(color.blue, 0), linewidth=2)
+plot(ema_slow, "Slow EMA", color=color.new(color.red, 0), linewidth=2)
+plot(ema_trend, "Trend EMA", color=color.new(color.yellow, 30), linewidth=1)
+
+// 绘制VWAP
+plot(vwap_value, "VWAP", color=color.new(color.purple, 0), linewidth=2)
+plot(vwap_upper, "VWAP Upper", color=color.new(color.purple, 70), linewidth=1)
+plot(vwap_lower, "VWAP Lower", color=color.new(color.purple, 70), linewidth=1)
+
+// 绘制Bollinger Bands
+plot(bb_upper, "BB Upper", color=color.new(color.gray, 70), linewidth=1)
+plot(bb_middle, "BB Middle", color=color.new(color.gray, 50), linewidth=1)
+plot(bb_lower, "BB Lower", color=color.new(color.gray, 70), linewidth=1)
+
+// 填充区域
+fill(plot(ema_fast), plot(ema_slow), color=ema_fast > ema_slow ? color.new(color.green, 90) : color.new(color.red, 90))
+
+// 信号标记
+plotshape(long_condition, "Long Signal", shape.triangleup, location.belowbar, color.new(color.green, 0), size=size.small)
+plotshape(short_condition, "Short Signal", shape.triangledown, location.abovebar, color.new(color.red, 0), size=size.small)
+
+// 大单活动标记
+plotshape(whale_activity and not whale_activity[1], "Whale Activity", shape.diamond, location.top, color.new(color.orange, 0), size=size.tiny)
+
+// 背景颜色（趋势）
+bgcolor(trend_up ? color.new(color.green, 95) : trend_down ? color.new(color.red, 95) : na)
+
+// ===========================
+// 信息面板
+// ===========================
+
+var table infoTable = table.new(position.top_right, 2, 10, bgcolor=color.new(color.black, 85))
+
+if barstate.islast
+    table.cell(infoTable, 0, 0, "指标", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 0, "数值", text_color=color.white, text_size=size.small)
+    
+    table.cell(infoTable, 0, 1, "RSI", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 1, str.tostring(rsi, "#.##"), text_color=rsi > rsi_ob ? color.red : rsi < rsi_os ? color.green : color.white, text_size=size.small)
+    
+    table.cell(infoTable, 0, 2, "MACD", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 2, macd_momentum ? "↑" : "↓", text_color=macd_momentum ? color.green : color.red, text_size=size.small)
+    
+    table.cell(infoTable, 0, 3, "成交量比", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 3, str.tostring(volume_ratio, "#.##"), text_color=high_volume ? color.green : color.white, text_size=size.small)
+    
+    table.cell(infoTable, 0, 4, "CVD信号", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 4, cvd_signal ? "多" : "空", text_color=cvd_signal ? color.green : color.red, text_size=size.small)
+    
+    table.cell(infoTable, 0, 5, "订单流", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 5, ofi_signal ? "买" : "卖", text_color=ofi_signal ? color.green : color.red, text_size=size.small)
+    
+    table.cell(infoTable, 0, 6, "智能资金", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 6, smart_money_positive ? "流入" : "流出", text_color=smart_money_positive ? color.green : color.red, text_size=size.small)
+    
+    table.cell(infoTable, 0, 7, "ATR%", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 7, str.tostring(atr_percent, "#.##%"), text_color=color.white, text_size=size.small)
+    
+    table.cell(infoTable, 0, 8, "趋势", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 8, trend_up ? "上升" : trend_down ? "下降" : "震荡", text_color=trend_up ? color.green : trend_down ? color.red : color.yellow, text_size=size.small)
+    
+    table.cell(infoTable, 0, 9, "仓位", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 9, strategy.position_size != 0 ? (strategy.position_size > 0 ? "多" : "空") : "空仓", text_color=strategy.position_size > 0 ? color.green : strategy.position_size < 0 ? color.red : color.gray, text_size=size.small)
+
+// ===========================
+// 策略统计输出
+// ===========================
+
+// 实时性能监控
+var float total_trades = 0
+var float winning_trades = 0
+var float total_profit = 0
+var float max_drawdown = 0
+var float current_streak = 0
+var float max_streak = 0
+
+if strategy.closedtrades > total_trades
+    total_trades := strategy.closedtrades
+    if strategy.closedtrades.profit(strategy.closedtrades - 1) > 0
+        winning_trades += 1
+        current_streak += 1
+        max_streak := math.max(max_streak, current_streak)
+    else
+        current_streak := 0
+    
+    total_profit := strategy.netprofit
+    max_drawdown := math.min(max_drawdown, strategy.equity - strategy.initial_capital)
+
+win_rate = total_trades > 0 ? (winning_trades / total_trades) * 100 : 0
+
+// 警报设置
+if long_condition
+    alert("【多头信号】ETH/USDT 1分钟\n" + 
+          "RSI: " + str.tostring(rsi, "#.##") + "\n" +
+          "成交量比: " + str.tostring(volume_ratio, "#.##") + "\n" +
+          "止损: " + str.tostring(long_sl, "#.##") + "\n" +
+          "止盈: " + str.tostring(long_tp, "#.##"), alert.freq_once_per_bar)
+
+if short_condition
+    alert("【空头信号】ETH/USDT 1分钟\n" + 
+          "RSI: " + str.tostring(rsi, "#.##") + "\n" +
+          "成交量比: " + str.tostring(volume_ratio, "#.##") + "\n" +
+          "止损: " + str.tostring(short_sl, "#.##") + "\n" +
+          "止盈: " + str.tostring(short_tp, "#.##"), alert.freq_once_per_bar)
